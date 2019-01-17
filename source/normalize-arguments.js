@@ -160,6 +160,7 @@ const normalize = (url, options, defaults) => {
 			console.warn('`options.query` is deprecated. We support it solely for compatibility - it will be removed in Got 11. Use `options.searchParams` instead.');
 			shownDeprecation = true;
 		}
+
 		searchParams = options.query;
 		delete options.query;
 	} else if (options.searchParams) {
