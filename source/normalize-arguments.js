@@ -169,6 +169,10 @@ const normalize = (url, options, defaults) => {
 
 	if (is.nonEmptyString(searchParams) || is.nonEmptyObject(searchParams) || searchParams instanceof URLSearchParams) {
 		if (!is.string(searchParams)) {
+			if (!(searchParams instanceof URLSearchParams)) {
+				validateSearchParams(searchParams);
+			}
+
 			searchParams = (new URLSearchParams(searchParams)).toString();
 		}
 
