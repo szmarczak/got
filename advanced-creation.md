@@ -25,6 +25,13 @@ A function making additional changes to the request.
 To inherit from parent, set it as `got.defaults.handler`.<br>
 To use the default handler, just omit specifying this.
 
+##### options.mutableDefaults
+
+Type: `boolean`<br>
+Default: `false`
+
+States if the defaults are mutable. It's very useful when you need to [update headers over time](readme.md#hooksafterresponse).
+
 ###### next()
 
 Returns a `Promise` or a `Stream` depending on [`options.stream`](readme.md#stream). Example:
@@ -104,7 +111,7 @@ const defaults = {
 	useElectronNet: false,
 	responseType: 'text',
 	resolveBodyOnly: 'false',
-	handler: (options, next) => next(options)
+	mutableDefaults: false
 };
 
 // Same as:

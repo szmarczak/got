@@ -55,10 +55,10 @@ const create = defaults => {
 
 	Object.assign(got, {...errors, mergeOptions: merge.options});
 	Object.defineProperty(got, 'defaults', {
-		value: deepFreeze(defaults),
-		writable: false,
-		configurable: false,
-		enumerable: true
+		value: defaults.mutableDefaults ? defaults : deepFreeze(defaults),
+		writable: defaults.mutableDefaults,
+		configurable: defaults.mutableDefaults,
+		enumerable: defaults.mutableDefaults
 	});
 
 	return got;

@@ -163,6 +163,32 @@ test('no tampering with defaults', t => {
 	t.is(instance2.defaults.baseUrl, baseUrl);
 });
 
+test('defaults can be mutable', t => {
+	const instance = got.create({
+		mutableDefaults: true,
+		followRedirect: false
+	});
+
+	t.notThrows(() => {
+		instance.defaults.followRedirect = true;
+	});
+
+	t.true(instance.defaults.followRedirect);
+});
+
+test('can set mutable defaults using got.extend', t => {
+	const instance = got.extend({
+		mutableDefaults: true,
+		followRedirect: false
+	});
+
+	t.notThrows(() => {
+		instance.defaults.followRedirect = true;
+	});
+
+	t.true(instance.defaults.followRedirect);
+});
+
 test('only plain objects are freezed', async t => {
 	const instance = got.extend({
 		agent: new http.Agent({keepAlive: true})
