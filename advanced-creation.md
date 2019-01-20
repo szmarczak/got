@@ -15,14 +15,7 @@ Configure a new `got` instance with the provided settings. You can access the re
 To inherit from parent, set it as `got.defaults.options` or use [`got.mergeOptions(defaults.options, options)`](readme.md#gotmergeoptionsparentoptions-newoptions).<br>
 **Note**: Avoid using [object spread](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_syntax#Spread_in_object_literals) as it doesn't work recursively.
 
-##### mutableDefaults
-
-Type: `boolean`<br>
-Default: `false`
-
-States if the defaults are mutable. It's very useful when you need to [update headers over time](readme.md#hooksafterresponse).
-
-##### handler
+##### options.handler
 
 Type: `Function`<br>
 Default: `undefined`
@@ -32,13 +25,9 @@ A function making additional changes to the request.
 To inherit from parent, set it as `got.defaults.handler`.<br>
 To use the default handler, just omit specifying this.
 
-###### [options](readme.md#options)
-
-**Note:** These options are [normalized](source/normalize-arguments.js).
-
 ###### next()
 
-Returns a `Promise` or a `Stream` depending on [`options.stream`](readme.md#stream).
+Returns a `Promise` or a `Stream` depending on [`options.stream`](readme.md#stream). Example:
 
 ```js
 const settings = {
@@ -53,7 +42,7 @@ const settings = {
 		// It's a Promise
 		return next(options);
 	},
-	options: got.mergeOptions(got.defaults.options, {
+	...got.mergeOptions(got.defaults.options, {
 		responseType: 'json'
 	})
 };
@@ -61,82 +50,76 @@ const settings = {
 const jsonGot = got.create(settings);
 ```
 
+Another example on how to recreate the Got instance from scratch:
+
 ```js
 const defaults = {
-	options: {
-		retry: {
-			retries: 2,
-			methods: [
-				'GET',
-				'PUT',
-				'HEAD',
-				'DELETE',
-				'OPTIONS',
-				'TRACE'
-			],
-			statusCodes: [
-				408,
-				413,
-				429,
-				500,
-				502,
-				503,
-				504
-			],
-			errorCodes: [
-				'ETIMEDOUT',
-				'ECONNRESET',
-				'EADDRINUSE',
-				'ECONNREFUSED',
-				'EPIPE',
-				'ENOTFOUND',
-				'ENETUNREACH',
-				'EAI_AGAIN'
-			]
-		},
-		headers: {
-			'user-agent': `${pkg.name}/${pkg.version} (https://github.com/sindresorhus/got)`
-		},
-		hooks: {
-			beforeError: [],
-			init: [],
-			beforeRequest: [],
-			beforeRedirect: [],
-			beforeRetry: [],
-			afterResponse: []
-		},
-		decompress: true,
-		throwHttpErrors: true,
-		followRedirect: true,
-		stream: false,
-		form: false,
-		cache: false,
-		useElectronNet: false,
-		responseType: 'text',
-		resolveBodyOnly: 'false'
+	retry: {
+		retries: 2,
+		methods: [
+			'GET',
+			'PUT',
+			'HEAD',
+			'DELETE',
+			'OPTIONS',
+			'TRACE'
+		],
+		statusCodes: [
+			408,
+			413,
+			429,
+			500,
+			502,
+			503,
+			504
+		],
+		errorCodes: [
+			'ETIMEDOUT',
+			'ECONNRESET',
+			'EADDRINUSE',
+			'ECONNREFUSED',
+			'EPIPE',
+			'ENOTFOUND',
+			'ENETUNREACH',
+			'EAI_AGAIN'
+		]
 	},
-	mutableDefaults: false
+	headers: {
+		'user-agent': `${pkg.name}/${pkg.version} (https://github.com/sindresorhus/got)`
+	},
+	hooks: {
+		beforeError: [],
+		init: [],
+		beforeRequest: [],
+		beforeRedirect: [],
+		beforeRetry: [],
+		afterResponse: []
+	},
+	decompress: true,
+	throwHttpErrors: true,
+	followRedirect: true,
+	stream: false,
+	form: false,
+	cache: false,
+	useElectronNet: false,
+	responseType: 'text',
+	resolveBodyOnly: 'false',
+	handler: (options, next) => next(options)
 };
 
 // Same as:
-const defaults = {
-	handler: got.defaults.handler,
-	options: got.defaults.options,
-	mutableDefaults: got.defaults.mutableDefaults
-};
-
+const defaults = got.defaults;
 const unchangedGot = got.create(defaults);
 ```
 
+Sometimes you don't need to use `got.create(...)`. Instead, `got.extend()` should be good enough:
+
 ```js
-const settings = {
-	handler: got.defaults.handler,
-	options: got.mergeOptions(got.defaults.options, {
-		headers: {
-			unicorn: 'rainbow'
-		}
-	})
-};
+const settings = got.mergeOptions(got.defaults.options, {
+	headers: {
+		unicorn: 'rainbow'
+	}
+});
 
 const unicorn = got.create(settings);
 
@@ -148,11 +131,7 @@ const unicorn = got.extend({headers: {unicorn: 'rainbow'}});
 
 Got supports composing multiple instances together. This is very powerful. You can create a client that limits download speed and then compose it with an instance that signs a request. It's like plugins without any of the plugin mess. You just create instances and then compose them together.
 
-#### got.mergeInstances(instanceA, instanceB, ...)
-
-Merges many instances into a single one:
-- options are merged using [`got.mergeOptions()`](readme.md#gotmergeoptionsparentoptions-newoptions) (+ hooks are merged too),
-- handlers are stored in an array.
+Just use `instanceA.extend(instanceB, instanceC, ...)`, that's all.
 
 ## Examples
 
@@ -161,17 +140,14 @@ Some examples of what kind of instances you could compose together:
 #### Denying redirects that lead to other sites than specified
 
 ```js
-const controlRedirects = got.create({
-	options: got.defaults.options,
-	handler: (options, next) => {
-		const promiseOrStream = next(options);
-		return promiseOrStream.on('redirect', resp => {
-			const host = new URL(resp.url).host;
-			if (options.allowedHosts && !options.allowedHosts.includes(host)) {
-				promiseOrStream.cancel(`Redirection to ${host} is not allowed`);
-			}
-		});
-	}
+const controlRedirects = got.extend((options, next) => {
+	const promiseOrStream = next(options);
+	return promiseOrStream.on('redirect', resp => {
+		const host = new URL(resp.url).host;
+		if (options.allowedHosts && !options.allowedHosts.includes(host)) {
+			promiseOrStream.cancel(`Redirection to ${host} is not allowed`);
+		}
+	});
 });
 ```
 
@@ -180,28 +156,25 @@ const controlRedirects = got.create({
 It's very useful in case your machine's got a little amount of RAM.
 
 ```js
-const limitDownloadUpload = got.create({
-    options: got.defaults.options,
-    handler: (options, next) => {
-        let promiseOrStream = next(options);
-        if (typeof options.downloadLimit === 'number') {
-            promiseOrStream.on('downloadProgress', progress => {
-        		if (progress.transferred > options.downloadLimit && progress.percent !== 1) {
-        			promiseOrStream.cancel(`Exceeded the download limit of ${options.downloadLimit} bytes`);
-        		}
-        	});
-        }
+const limitDownloadUpload = got.extend((options, next) => {
+	let promiseOrStream = next(options);
+	if (typeof options.downloadLimit === 'number') {
+		promiseOrStream.on('downloadProgress', progress => {
+			if (progress.transferred > options.downloadLimit && progress.percent !== 1) {
+				promiseOrStream.cancel(`Exceeded the download limit of ${options.downloadLimit} bytes`);
+			}
+		});
+	}
 
-        if (typeof options.uploadLimit === 'number') {
-            promiseOrStream.on('uploadProgress', progress => {
-        		if (progress.transferred > options.uploadLimit && progress.percent !== 1) {
-        			promiseOrStream.cancel(`Exceeded the upload limit of ${options.uploadLimit} bytes`);
-        		}
-        	});
-        }
+	if (typeof options.uploadLimit === 'number') {
+		promiseOrStream.on('uploadProgress', progress => {
+			if (progress.transferred > options.uploadLimit && progress.percent !== 1) {
+				promiseOrStream.cancel(`Exceeded the upload limit of ${options.uploadLimit} bytes`);
+			}
+		});
+	}
 
-        return promiseOrStream;
-    }
+	return promiseOrStream;
 });
 ```
 
@@ -241,12 +214,12 @@ const signRequest = got.extend({
 
 #### Putting it all together
 
-If these instances are different modules and you don't want to rewrite them, use `got.mergeInstances()`.
+If these instances are different modules and you don't want to rewrite them, use `got.extend()`.
 
 **Note**: The `noUserAgent` instance must be placed at the end of chain as the instances are merged in order. Other instances do have the `user-agent` header.
 
 ```js
-const merged = got.mergeInstances(controlRedirects, limitDownloadUpload, httpbin, signRequest, noUserAgent);
+const merged = got.extend(controlRedirects, limitDownloadUpload, httpbin, signRequest, noUserAgent);
 
 (async () => {
 	// There's no 'user-agent' header :)

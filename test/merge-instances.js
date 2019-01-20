@@ -22,7 +22,7 @@ test.after('cleanup', async () => {
 test('merging instances', async t => {
 	const instanceA = got.extend({headers: {unicorn: 'rainbow'}});
 	const instanceB = got.extend({baseUrl: s.url});
-	const merged = got.mergeInstances(instanceA, instanceB);
+	const merged = instanceA.extend(instanceB);
 
 	const headers = await merged('/').json();
 	t.is(headers.unicorn, 'rainbow');
@@ -31,29 +31,26 @@ test('merging instances', async t => {
 
 test('works even if no default handler in the end', async t => {
 	const instanceA = got.create({
-		options: {},
 		handler: (options, next) => next(options)
 	});
 
 	const instanceB = got.create({
-		options: {},
 		handler: (options, next) => next(options)
 	});
 
-	const merged = got.mergeInstances(instanceA, instanceB);
+	const merged = instanceA.extend(instanceB);
 	await t.notThrows(() => merged(s.url));
 });
 
 test('merges default handlers & custom handlers', async t => {
 	const instanceA = got.extend({headers: {unicorn: 'rainbow'}});
 	const instanceB = got.create({
-		options: {},
 		handler: (options, next) => {
 			options.headers.cat = 'meow';
 			return next(options);
 		}
 	});
-	const merged = got.mergeInstances(instanceA, instanceB);
+	const merged = instanceA.extend(instanceB);
 
 	const headers = await merged(s.url).json();
 	t.is(headers.unicorn, 'rainbow');
@@ -66,8 +63,8 @@ test('merging one group & one instance', async t => {
 	const instanceC = got.extend({headers: {bird: 'tweet'}});
 	const instanceD = got.extend({headers: {mouse: 'squeek'}});
 
-	const merged = got.mergeInstances(instanceA, instanceB, instanceC);
-	const doubleMerged = got.mergeInstances(merged, instanceD);
+	const merged = instanceA.extend(instanceB, instanceC);
+	const doubleMerged = merged.extend(instanceD);
 
 	const headers = await doubleMerged(s.url).json();
 	t.is(headers.dog, 'woof');
@@ -82,10 +79,10 @@ test('merging two groups of merged instances', async t => {
 	const instanceC = got.extend({headers: {bird: 'tweet'}});
 	const instanceD = got.extend({headers: {mouse: 'squeek'}});
 
-	const groupA = got.mergeInstances(instanceA, instanceB);
-	const groupB = got.mergeInstances(instanceC, instanceD);
+	const groupA = instanceA.extend(instanceB);
+	const groupB = instanceC.extend(instanceD);
 
-	const merged = got.mergeInstances(groupA, groupB);
+	const merged = groupA.extend(groupB);
 
 	const headers = await merged(s.url).json();
 	t.is(headers.dog, 'woof');
@@ -95,7 +92,7 @@ test('merging two groups of merged instances', async t => {
 });
 
 test('hooks are merged', t => {
-	const getBeforeRequestHooks = instance => instance.defaults.options.hooks.beforeRequest;
+	const getBeforeRequestHooks = instance => instance.defaults.hooks.beforeRequest;
 
 	const instanceA = got.extend({hooks: {
 		beforeRequest: [
@@ -112,7 +109,7 @@ test('hooks are merged', t => {
 		]
 	}});
 
-	const merged = got.mergeInstances(instanceA, instanceB);
+	const merged = instanceA.extend(instanceB);
 	t.deepEqual(getBeforeRequestHooks(merged), getBeforeRequestHooks(instanceA).concat(getBeforeRequestHooks(instanceB)));
 });
 
@@ -131,6 +128,6 @@ test('hooks are passed by though other instances don\'t have them', t => {
 		options: {hooks: {}}
 	});
 
-	const merged = got.mergeInstances(instanceA, instanceB, instanceC);
-	t.deepEqual(merged.defaults.options.hooks.beforeRequest, instanceA.defaults.options.hooks.beforeRequest);
+	const merged = instanceA.extend(instanceB, instanceC);
+	t.deepEqual(merged.defaults.hooks.beforeRequest, instanceA.defaults.hooks.beforeRequest);
 });

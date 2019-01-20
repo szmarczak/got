@@ -19,7 +19,7 @@ const aliases = [
 
 const create = defaults => {
 	defaults = merge({}, defaults);
-	normalizeArguments.preNormalize(defaults.options);
+	normalizeArguments.preNormalize(defaults);
 
 	if (!defaults.handler) {
 		// This can't be getPromiseOrStream, because when merging
@@ -40,23 +40,11 @@ const create = defaults => {
 	}
 
 	got.create = create;
-	got.extend = options => {
-		let mutableDefaults;
-		if (options && Reflect.has(options, 'mutableDefaults')) {
-			mutableDefaults = options.mutableDefaults;
-			delete options.mutableDefaults;
-		} else {
-			mutableDefaults = defaults.mutableDefaults;
-		}
+	got.extend = (...args) => {
+		args = args.map(arg => Reflect.has(arg, 'defaults') ? arg.defaults : arg);
 
-		return create({
-			options: merge.options(defaults.options, options),
-			handler: defaults.handler,
-			mutableDefaults
-		});
+		return create(merge.options(defaults, ...args));
 	};
-
-	got.mergeInstances = (...args) => create(merge.instances(args));
 
 	got.stream = (url, options) => got(url, {...options, stream: true});
 
@@ -67,9 +55,9 @@ const create = defaults => {
 
 	Object.assign(got, {...errors, mergeOptions: merge.options});
 	Object.defineProperty(got, 'defaults', {
-		value: defaults.mutableDefaults ? defaults : deepFreeze(defaults),
-		writable: defaults.mutableDefaults,
-		configurable: defaults.mutableDefaults,
+		value: deepFreeze(defaults),
+		writable: false,
+		configurable: false,
 		enumerable: true
 	});
 

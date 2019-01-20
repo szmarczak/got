@@ -31,9 +31,11 @@ const merge = (target, ...sources) => {
 };
 
 const mergeOptions = (...sources) => {
-	sources = sources.map(source => source || {});
+	// Merge options
+	sources = sources.map(source => typeof source === 'function' ? {handler: source} : (source || {}));
 	const merged = merge({}, ...sources);
 
+	// Merge hooks
 	const hooks = {};
 	for (const hook of knownHookEvents) {
 		hooks[hook] = [];
@@ -49,25 +51,22 @@ const mergeOptions = (...sources) => {
 
 	merged.hooks = hooks;
 
-	return merged;
-};
+	// Merge handlers
+	const handlers = sources.filter(source => Reflect.has(source, 'handler')).map(source => source.handler);
 
-const mergeInstances = (instances, methods) => {
-	const handlers = instances.map(instance => instance.defaults.handler);
-	const size = instances.length - 1;
+	if (handlers.length > 1) {
+		const handlersCount = handlers.length - 1;
 
-	return {
-		methods,
-		options: mergeOptions(...instances.map(instance => instance.defaults.options)),
-		handler: (options, next) => {
+		merged.handler = (options, next) => {
 			let iteration = -1;
-			const iterate = options => handlers[++iteration](options, iteration === size ? next : iterate);
+			const iterate = options => handlers[++iteration](options, iteration === handlersCount ? next : iterate);
 
 			return iterate(options);
-		}
-	};
+		};
+	}
+
+	return merged;
 };
 
 module.exports = merge;
 module.exports.options = mergeOptions;
-module.exports.instances = mergeInstances;

@@ -28,8 +28,14 @@ const preNormalize = (options, defaults) => {
 		options.headers = lowercaseKeys(options.headers);
 	}
 
-	if (options.baseUrl && !options.baseUrl.toString().endsWith('/')) {
-		options.baseUrl += '/';
+	if (options.baseUrl) {
+		if (!options.baseUrl.toString().endsWith('/')) {
+			options.baseUrl += '/';
+		}
+
+		if (is.string(options.baseUrl)) {
+			options.baseUrl = new URL(options.baseUrl);
+		}
 	}
 
 	if (is.nullOrUndefined(options.hooks)) {
@@ -103,7 +109,7 @@ const normalize = (url, options, defaults) => {
 	}
 
 	if (defaults) {
-		options = merge({}, defaults.options, options ? preNormalize(options, defaults.options) : {});
+		options = merge({}, defaults, options ? preNormalize(options, defaults) : {});
 	} else {
 		options = merge({}, preNormalize(options));
 	}

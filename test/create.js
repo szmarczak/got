@@ -79,27 +79,48 @@ test('extend overwrites arrays with a deep clone', t => {
 	const beforeRequest = [0];
 	const a = got.extend({hooks: {beforeRequest}});
 	beforeRequest[0] = 1;
-	t.deepEqual(a.defaults.options.hooks.beforeRequest, [0]);
-	t.not(a.defaults.options.hooks.beforeRequest, beforeRequest);
+	t.deepEqual(a.defaults.hooks.beforeRequest, [0]);
+	t.not(a.defaults.hooks.beforeRequest, beforeRequest);
 });
 
 test('extend keeps the old value if the new one is undefined', t => {
 	const a = got.extend({headers: undefined});
 	t.deepEqual(
-		a.defaults.options.headers,
-		got.defaults.options.headers
+		a.defaults.headers,
+		got.defaults.headers
 	);
 });
 
 test('extend merges URL instances', t => {
 	const a = got.extend({baseUrl: new URL('https://example.com')});
 	const b = a.extend({baseUrl: '/foo'});
-	t.is(b.defaults.options.baseUrl.toString(), 'https://example.com/foo/');
+	t.is(b.defaults.baseUrl.toString(), 'https://example.com/foo/');
+});
+
+test('extend with custom handler', async t => {
+	const instance = got.extend((options, next) => {
+		options.headers.unicorn = 'rainbow';
+		return next(options);
+	});
+	const headers = await instance(s.url).json();
+	t.is(headers.unicorn, 'rainbow');
+});
+
+test('extend with instances', t => {
+	const a = got.extend({baseUrl: new URL('https://example.com/')});
+	const b = got.extend(a);
+	t.is(b.defaults.baseUrl.toString(), 'https://example.com/');
+});
+
+test('extend with a chain', t => {
+	const a = got.extend({baseUrl: 'https://example.com/'});
+	const b = got.extend(a, {headers: {foo: 'bar'}});
+	t.is(b.defaults.baseUrl.toString(), 'https://example.com/');
+	t.is(b.defaults.headers.foo, 'bar');
 });
 
 test('create', async t => {
 	const instance = got.create({
-		options: {},
 		handler: (options, next) => {
 			options.headers.unicorn = 'rainbow';
 			return next(options);
@@ -114,10 +135,10 @@ test('hooks are merged on got.extend()', t => {
 	const hooksA = [() => {}];
 	const hooksB = [() => {}];
 
-	const instanceA = got.create({options: {hooks: {beforeRequest: hooksA}}});
+	const instanceA = got.create({hooks: {beforeRequest: hooksA}});
 
 	const extended = instanceA.extend({hooks: {beforeRequest: hooksB}});
-	t.deepEqual(extended.defaults.options.hooks.beforeRequest, hooksA.concat(hooksB));
+	t.deepEqual(extended.defaults.hooks.beforeRequest, hooksA.concat(hooksB));
 });
 
 test('custom endpoint with custom headers (extend)', async t => {
@@ -128,53 +149,18 @@ test('custom endpoint with custom headers (extend)', async t => {
 });
 
 test('no tampering with defaults', t => {
-	const instance = got.create({
-		handler: got.defaults.handler,
-		options: got.mergeOptions(got.defaults.options, {
-			baseUrl: 'example/'
-		})
-	});
+	const baseUrl = new URL('https://example.com');
+	const instance = got.extend({baseUrl});
 
-	const instance2 = instance.create({
-		handler: instance.defaults.handler,
-		options: instance.defaults.options
-	});
+	const instance2 = instance.create(instance.defaults);
 
 	// Tamper Time
 	t.throws(() => {
-		instance.defaults.options.baseUrl = 'http://google.com';
+		instance.defaults.baseUrl = 'http://google.com';
 	});
 
-	t.is(instance.defaults.options.baseUrl, 'example/');
-	t.is(instance2.defaults.options.baseUrl, 'example/');
-});
-
-test('defaults can be mutable', t => {
-	const instance = got.create({
-		mutableDefaults: true,
-		options: {
-			followRedirect: false
-		}
-	});
-
-	t.notThrows(() => {
-		instance.defaults.options.followRedirect = true;
-	});
-
-	t.true(instance.defaults.options.followRedirect);
-});
-
-test('can set mutable defaults using got.extend', t => {
-	const instance = got.extend({
-		mutableDefaults: true,
-		followRedirect: false
-	});
-
-	t.notThrows(() => {
-		instance.defaults.options.followRedirect = true;
-	});
-
-	t.true(instance.defaults.options.followRedirect);
+	t.is(instance.defaults.baseUrl, baseUrl);
+	t.is(instance2.defaults.baseUrl, baseUrl);
 });
 
 test('only plain objects are freezed', async t => {

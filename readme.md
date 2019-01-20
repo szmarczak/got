@@ -656,9 +656,11 @@ Sets `options.method` to the method name and makes a request.
 
 ### Instances
 
-#### got.extend([options])
+#### got.extend([options | handler | gotInstance], ...)
 
-Configure a new `got` instance with default `options`. The `options` are merged with the parent instance's `defaults.options` using [`got.mergeOptions`](#gotmergeoptionsparentoptions-newoptions). You can access the resolved options with the `.defaults` property on the instance.
+##### options
+
+Configure a new `got` instance with default `options`. Options are merged using [`got.mergeOptions(instance.defaults, options)`](#gotmergeoptionsparentoptions-newoptions). You can access the resolved options with the `.defaults` property on the instance.
 
 ```js
 const client = got.extend({
@@ -677,27 +679,38 @@ client.get('/demo');
  */
 ```
 
-```js
-(async () => {
-	const client = got.extend({
-		baseUrl: 'httpbin.org',
-		headers: {
-			'x-foo': 'bar'
-		}
-	});
-	const {headers} = (await client.get('/headers').json()).body;
-	//=> headers['x-foo'] === 'bar'
+##### handler
 
-	const jsonClient = client.extend({
-		responseType: 'json',
-		headers: {
-			'x-baz': 'qux'
-		}
-	});
-	const {headers: headers2} = (await jsonClient.get('/headers')).body;
-	//=> headers2['x-foo'] === 'bar'
-	//=> headers2['x-baz'] === 'qux'
-})();
+Configure a new `got` instance with inherited options and additional handler.
+
+```js
+const instance = got.extend((options, next) => {
+	if (!options.stream) {
+		return next(options).catch(error => {
+			if (error.response && error.response.body) {
+				error.name = 'API error';
+			}
+
+			throw error;
+		});
+	}
+
+	return next(options);
+});
+```
+
+##### gotInstance
+
+Instances are merged in the following way:
+- options are merged using [`got.mergeOptions()`](readme.md#gotmergeoptionsparentoptions-newoptions) (+ hooks are merged too),
+- handlers are stored in an array.
+
+
+```js
+const instanceA = got.extend({headers: {cat: 'meow', wolf: ['bark', 'wrrr']}});
+const instanceB = got.extend({headers: {cow: 'moo', wolf: ['auuu']}});
+
+const merged = instanceA.extend(instanceB);
 ```
 
 **Tip:** Need more control over the behavior of Got? Check out the [`got.create()`](advanced-creation.md).
@@ -728,7 +741,7 @@ Options are deeply merged to a new object. The value of each key is determined a
 
 Type: `Object`
 
-The default Got options.
+The default Got options used in that instance.
 
 ## Errors
 

@@ -213,8 +213,7 @@ test('backslash in the beginning of `url` is optional when using baseUrl', async
 
 test('throws when trying to modify baseUrl after options got normalized', async t => {
 	const instanceA = got.create({
-		methods: [],
-		options: {baseUrl: 'https://example.com'},
+		baseUrl: 'https://example.com',
 		handler: options => {
 			options.baseUrl = 'https://google.com';
 		}
