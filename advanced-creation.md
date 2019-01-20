@@ -110,7 +110,7 @@ const defaults = {
 	cache: false,
 	useElectronNet: false,
 	responseType: 'text',
-	resolveBodyOnly: 'false',
+	resolveBodyOnly: false,
 	mutableDefaults: false
 };
 
