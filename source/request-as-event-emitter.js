@@ -201,7 +201,7 @@ module.exports = (options, input) => {
 				if (is.nodeStream(options.body)) {
 					options.body.once('end', uploadComplete);
 					options.body.pipe(request);
-					options.body = undefined;
+					delete options.body;
 				} else if (options.body) {
 					request.end(options.body, uploadComplete);
 				} else if (input && (options.method === 'POST' || options.method === 'PUT' || options.method === 'PATCH')) {
@@ -275,6 +275,10 @@ module.exports = (options, input) => {
 		} else {
 			shouldAbort = true;
 		}
+	};
+
+	emitter.sendRequest = () => {
+
 	};
 
 	setImmediate(async () => {

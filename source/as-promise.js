@@ -3,13 +3,17 @@ const EventEmitter = require('events');
 const getStream = require('get-stream');
 const is = require('@sindresorhus/is');
 const PCancelable = require('p-cancelable');
+const pEvent = require('p-event');
 const requestAsEventEmitter = require('./request-as-event-emitter');
 const {HTTPError, ParseError, ReadError} = require('./errors');
 const {options: mergeOptions} = require('./merge');
 const {reNormalize} = require('./normalize-arguments');
 
-const asPromise = options => {
+const asPromise = () => {
+	let options = {};
+
 	const proxy = new EventEmitter();
+	const signal = new EventEmitter();
 
 	const parseBody = response => {
 		if (options.responseType === 'json') {
@@ -21,7 +25,18 @@ const asPromise = options => {
 		}
 	};
 
-	const promise = new PCancelable((resolve, reject, onCancel) => {
+	const promise = new PCancelable(async (resolve, reject, onCancel) => {
+		const newOptions = await pEvent(signal, 'options');
+
+		if (promise.isCanceled) {
+			return;
+		}
+
+		options = {
+			...newOptions,
+			...options
+		};
+
 		const emitter = requestAsEventEmitter(options);
 
 		onCancel(emitter.abort);
@@ -106,6 +121,11 @@ const asPromise = options => {
 			'downloadProgress'
 		].forEach(event => emitter.on(event, (...args) => proxy.emit(event, ...args)));
 	});
+
+	promise._sendRequest = options => {
+		signal.emit('options', options);
+		return promise;
+	};
 
 	promise.on = (name, fn) => {
 		proxy.on(name, fn);
