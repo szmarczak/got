@@ -2,7 +2,7 @@ import test from 'ava';
 import getStream from 'get-stream';
 import delay = require('delay');
 import {Handler} from 'express';
-import got from '../source';
+import got, {RequestError} from '../source';
 import withServer from './helpers/with-server';
 
 const errorString = 'oops';
@@ -654,9 +654,13 @@ test('beforeError allows modifications', async t => {
 			throw error;
 		},
 		hooks: {
-			beforeError: [() => {
-				return new Error(errorString2);
-			}]
+			beforeError: [
+				error => {
+					const newError = new Error(errorString2);
+
+					return new RequestError(errorString, newError, error.options);
+				}
+			]
 		}
 	}), {message: errorString2});
 });
@@ -688,7 +692,7 @@ test('catches HTTPErrors', withServer, async (t, _server, got) => {
 	await t.throwsAsync(got({
 		hooks: {
 			beforeError: [
-				(error: Error) => {
+				error => {
 					t.true(error instanceof got.HTTPError);
 					return error;
 				}

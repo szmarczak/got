@@ -140,6 +140,7 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 						const retry = async (): Promise<void> => {
 							try {
 								for (const hook of options.hooks.beforeRetry) {
+									// eslint-disable-next-line no-await-in-loop
 									await hook(options, error, retryCount);
 								}
 							} catch (error_) {

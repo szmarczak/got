@@ -5,8 +5,9 @@ import test from 'ava';
 import {Handler} from 'express';
 import FormData = require('form-data');
 import got, {Headers} from '../source';
-import supportsBrotli from '../source/utils/supports-brotli';
 import withServer from './helpers/with-server';
+
+const supportsBrotli = typeof (process.versions as any).brotli === 'string';
 
 const echoHeaders: Handler = (request, response) => {
 	request.resume();

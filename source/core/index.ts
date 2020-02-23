@@ -32,6 +32,7 @@ const kBodySize = Symbol('bodySize');
 const kUploadedSize = Symbol('uploadedSize');
 const kServerResponsesPiped = Symbol('serverResponsesPiped');
 const kUnproxyEvents = Symbol('unproxyEvents');
+const kIsFromCache = Symbol('isFromCache');
 export const kIsNormalizedAlready = Symbol('kIsNormalizedAlready');
 
 const supportsBrotli = is.string((process.versions as any).brotli);
@@ -78,10 +79,12 @@ export type Method =
 	| 'options'
 	| 'trace';
 
-export type InitHook = (options: Options & {url: string | URL}) => void | Promise<void>;
-export type BeforeRequestHook = <T = void | IncomingMessage | ResponseLike>(options: NormalizedOptions) => T | Promise<T>;
-export type BeforeRedirectHook = (options: NormalizedOptions, response: IncomingMessage) => void | Promise<void>;
-export type BeforeErrorHook = (error: RequestError) => RequestError | Promise<RequestError>;
+type Promisable<T> = T | Promise<T>;
+
+export type InitHook = (options: Options & {url: string | URL}) => Promisable<void>;
+export type BeforeRequestHook = (options: NormalizedOptions) => Promisable<void | Response | ResponseLike>;
+export type BeforeRedirectHook = (options: NormalizedOptions, response: Response) => Promisable<void>;
+export type BeforeErrorHook = (error: RequestError) => Promisable<RequestError>;
 
 export interface Hooks {
 	init?: InitHook[];
@@ -96,9 +99,11 @@ export const knownHookEvents: HookEvent[] = ['init', 'beforeRequest', 'beforeRed
 
 export type RequestFunction<T = IncomingMessage | ResponseLike> = (url: URL, options: RequestOptions, callback?: (response: T) => void) => ClientRequest | T | Promise<ClientRequest> | Promise<T> | undefined;
 
-export interface Options extends Omit<RequestOptions, 'agent' | 'timeout' | 'path' | 'auth'> {
+export type Headers = Record<string, string | string[] | undefined>;
+
+export interface Options extends Omit<RequestOptions, 'agent' | 'timeout' | 'path' | 'auth' | 'headers'> {
 	request?: RequestFunction;
-	agent?: Agents;
+	agent?: Agents | false;
 	decompress?: boolean;
 	timeout?: Delays | number;
 	prefixUrl?: string | URL;
@@ -124,6 +129,7 @@ export interface Options extends Omit<RequestOptions, 'agent' | 'timeout' | 'pat
 	allowGetBody?: boolean;
 	lookup?: CacheableLookup['lookup'];
 	rejectUnauthorized?: boolean;
+	headers?: Headers;
 }
 
 export interface NormalizedOptions extends Options {
@@ -135,7 +141,7 @@ export interface NormalizedOptions extends Options {
 	decompress: boolean;
 	searchParams?: URLSearchParams;
 	cookieJar?: PromiseCookieJar;
-	headers: http.OutgoingHttpHeaders;
+	headers: Headers;
 	context: object;
 	hooks: Required<Hooks>;
 	followRedirects: boolean;
@@ -161,9 +167,9 @@ export interface Defaults {
 	context: object;
 	cookieJar?: PromiseCookieJar | ToughCookieJar;
 	dnsCache?: CacheableLookup;
-	headers: http.OutgoingHttpHeaders;
+	headers: Headers;
 	hooks: Required<Hooks>;
-	followRedirects: boolean;
+	followRedirect: boolean;
 	maxRedirects: number;
 	cache?: string | CacheableRequest.StorageAdapter;
 	throwHttpErrors: boolean;
@@ -184,6 +190,7 @@ export interface PlainResponse extends IncomingMessage {
 	ip?: string;
 	isFromCache: boolean;
 	statusCode: number;
+	url: string;
 }
 
 // For Promise support
@@ -350,6 +357,13 @@ export class ReadError extends RequestError {
 	}
 }
 
+export class UnsupportedProtocolError extends RequestError {
+	constructor(options: NormalizedOptions) {
+		super(`Unsupported protocol "${options.url.protocol}"`, {}, options);
+		this.name = 'UnsupportedProtocolError';
+	}
+}
+
 export default class Request extends Duplex implements RequestEvents<Request> {
 	['constructor']: typeof Request;
 
@@ -361,6 +375,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	[kUploadedSize]: number;
 	[kBodySize]?: number;
 	[kServerResponsesPiped]: Set<ServerResponse>;
+	[kIsFromCache]?: boolean;
 
 	declare options: NormalizedOptions;
 	declare requestUrl: string;
@@ -498,6 +513,12 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			throw new TypeError(`Parameter \`prefixUrl\` must be a string, not ${is(options.prefixUrl)}`);
 		} else if (is.string(options.url)) {
 			options.url = new URL(options.url);
+		}
+
+		// Protocol check
+		const {protocol} = options.url!;
+		if (protocol !== 'http:' && protocol !== 'https:') {
+			throw new UnsupportedProtocolError(options as NormalizedOptions);
 		}
 
 		// `options.username` & `options.password`
@@ -662,6 +683,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		options.decompress = Boolean(options.decompress);
 		options.ignoreInvalidCookies = Boolean(options.ignoreInvalidCookies);
 		options.followRedirects = Boolean(options.followRedirects);
+		options.followRedirect = options.followRedirects;
 		options.maxRedirects = options.maxRedirects ?? 0;
 		options.throwHttpErrors = Boolean(options.throwHttpErrors);
 		options.http2 = Boolean(options.http2);
@@ -792,6 +814,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		typedResponse.isFromCache = (response as any).fromCache || false;
 		typedResponse.ip = typedResponse.isFromCache ? undefined : response.socket.remoteAddress!;
 
+		this[kIsFromCache] = typedResponse.isFromCache;
+
 		if (options.followRedirects && response.headers.location && redirectCodes.has(statusCode)) {
 			response.resume(); // We're being redirected, we don't care about the response.
 
@@ -824,7 +848,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 			for (const hook of options.hooks.beforeRedirect) {
 				// eslint-disable-next-line no-await-in-loop
-				await hook(options, response);
+				await hook(options, typedResponse);
 			}
 
 			this.emit('redirect', typedResponse, options);
@@ -1064,8 +1088,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 	}
 
-	// A bug.
-	// eslint-disable-next-line @typescript-eslint/no-untyped-public-signature
 	_write(chunk: any, encoding: string, callback: (error?: Error | null) => void): void {
 		const {options} = this;
 		if (options.method in withoutBody) {
@@ -1086,8 +1108,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 	}
 
-	// A bug.
-	// eslint-disable-next-line @typescript-eslint/no-untyped-public-signature
 	_writeRequest(chunk: any, encoding: string, callback: (error?: Error | null) => void): void {
 		this[kRequest].write(chunk, encoding, (error?: Error | null) => {
 			if (!error) {
@@ -1179,6 +1199,10 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 	get flushedHeaders(): boolean {
 		return Boolean(this[kRequest]);
+	}
+
+	get isFromCache(): boolean | undefined {
+		return this[kIsFromCache];
 	}
 
 	pipe<T extends NodeJS.WritableStream>(destination: T, options?: {end?: boolean}): T {

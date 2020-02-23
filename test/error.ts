@@ -3,7 +3,7 @@ import http = require('http');
 import stream = require('stream');
 import test from 'ava';
 import proxyquire = require('proxyquire');
-import got, {GotError, HTTPError} from '../source';
+import got, {RequestError, HTTPError} from '../source';
 import withServer from './helpers/with-server';
 
 const pStreamPipeline = promisify(stream.pipeline);
@@ -34,7 +34,7 @@ test('properties', withServer, async (t, server, got) => {
 });
 
 test('catches dns errors', async t => {
-	const error = await t.throwsAsync<GotError>(got('http://doesntexist', {retry: 0}));
+	const error = await t.throwsAsync<RequestError>(got('http://doesntexist', {retry: 0}));
 	t.truthy(error);
 	t.regex(error.message, /getaddrinfo ENOTFOUND/);
 	t.is(error.options.url.host, 'doesntexist');
@@ -102,11 +102,11 @@ test('contains Got options', withServer, async (t, server, got) => {
 		response.end();
 	});
 
-	const options = {
+	const options: {agent: false} = {
 		agent: false
 	};
 
-	const error = await t.throwsAsync<GotError>(got(options));
+	const error = await t.throwsAsync<RequestError>(got(options));
 	t.is(error.options.agent, options.agent);
 });
 

@@ -52,7 +52,7 @@ const defaults: InstanceDefaults = {
 		},
 		decompress: true,
 		throwHttpErrors: true,
-		followRedirects: true,
+		followRedirect: true,
 		isStream: false,
 		responseType: 'text',
 		resolveBodyOnly: false,

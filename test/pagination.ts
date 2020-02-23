@@ -72,7 +72,7 @@ test('filters elements', withServer, async (t, server, got) => {
 
 	const result = await got.paginate.all({
 		_pagination: {
-			filter: element => element !== 2
+			filter: (element: unknown) => element !== 2
 		}
 	});
 

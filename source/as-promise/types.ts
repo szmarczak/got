@@ -1,4 +1,5 @@
 import PCancelable = require('p-cancelable');
+import {CancelError} from 'p-cancelable';
 import {
 	// Interfaces to be extended
 	Options as RequestOptions,
@@ -15,6 +16,7 @@ import {
 	TimeoutError,
 	HTTPError,
 	ReadError,
+	UnsupportedProtocolError,
 
 	// Hooks to be exported
 	HookEvent as RequestHookEvent,
@@ -25,6 +27,8 @@ import {
 
 	// Other types to be exported
 	Progress,
+	Headers,
+	RequestFunction,
 
 	// Types that will not be exported
 	Method,
@@ -129,7 +133,9 @@ export {
 	UploadError,
 	TimeoutError,
 	HTTPError,
-	ReadError
+	ReadError,
+	UnsupportedProtocolError,
+	CancelError
 };
 
 export {
@@ -140,5 +146,7 @@ export {
 };
 
 export {
-	Progress
+	Progress,
+	Headers,
+	RequestFunction
 };

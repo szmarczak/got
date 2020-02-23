@@ -164,7 +164,9 @@ test('only plain objects are freezed', withServer, async (t, server, got) => {
 	server.get('/', echoHeaders);
 
 	const instance = got.extend({
-		agent: new HttpAgent({keepAlive: true})
+		agent: {
+			http: new HttpAgent({keepAlive: true})
+		}
 	});
 
 	await t.notThrowsAsync(() => instance(''));
