@@ -46,6 +46,8 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 			onCancel(request.destroy);
 
 			request.once('response', async (response: Response) => {
+				response.retryCount = retryCount;
+
 				// Download body
 				try {
 					body = await getStream.buffer(response, {encoding: 'binary'});

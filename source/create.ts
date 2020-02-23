@@ -50,7 +50,11 @@ export type HTTPAlias =
 	| 'delete';
 
 export type GotReturn = Request | CancelableRequest;
-type GotStreamFunction = (url: string | URL, options?: Options & {isStream: true}) => Request;
+
+interface GotStreamFunction {
+	(url: string | URL, options?: Options & {isStream?: true}): Request;
+	(options?: Options & {isStream?: true}): Request;
+}
 
 const getPromiseOrStream = (options: NormalizedOptions): GotReturn => options.isStream ? new Request(options.url, options) : asPromise(options);
 
@@ -333,11 +337,14 @@ const create = (defaults: InstanceDefaults): Got => {
 		return results;
 	}) as GotPaginate['all'];
 
-	got.stream = ((url, options) => got(url, {...options, isStream: true})) as GotStream;
+	got.stream = ((url: string | URL, options?: Options) => got(url, {...options, isStream: true})) as GotStream;
 
 	for (const method of aliases) {
 		got[method] = ((url: string | URL, options?: Options): GotReturn => got(url, {...options, method})) as GotRequest;
-		got.stream[method] = (url, options) => got.stream(url, {...options, method} as (Options & {isStream: true}));
+
+		got.stream[method] = ((url: string | URL, options?: Options & {isStream: true}) => {
+			return got.stream(url, {...options, method});
+		}) as GotStream;
 	}
 
 	Object.assign(got, {...errors, mergeOptions});

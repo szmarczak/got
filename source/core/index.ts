@@ -37,9 +37,9 @@ export const kIsNormalizedAlready = Symbol('kIsNormalizedAlready');
 const supportsBrotli = is.string((process.versions as any).brotli);
 
 export interface Agents {
-	http: http.Agent;
-	https: https.Agent;
-	http2: unknown;
+	http?: http.Agent;
+	https?: https.Agent;
+	http2?: unknown;
 }
 
 export const isAgents = (value: any): value is Agents => {
@@ -98,7 +98,7 @@ export type RequestFunction<T = IncomingMessage | ResponseLike> = (url: URL, opt
 
 export interface Options extends Omit<RequestOptions, 'agent' | 'timeout' | 'path' | 'auth'> {
 	request?: RequestFunction;
-	agent?: Agents | http.Agent | https.Agent;
+	agent?: Agents;
 	decompress?: boolean;
 	timeout?: Delays | number;
 	prefixUrl?: string | URL;
@@ -122,6 +122,8 @@ export interface Options extends Omit<RequestOptions, 'agent' | 'timeout' | 'pat
 	password?: string;
 	http2?: boolean;
 	allowGetBody?: boolean;
+	lookup?: CacheableLookup['lookup'];
+	rejectUnauthorized?: boolean;
 }
 
 export interface NormalizedOptions extends Options {
@@ -144,6 +146,8 @@ export interface NormalizedOptions extends Options {
 	cacheableRequest?: (options: string | URL | http.RequestOptions, callback?: (response: http.ServerResponse | ResponseLike) => void) => CacheableRequest.Emitter;
 	http2: boolean;
 	allowGetBody: boolean;
+	rejectUnauthorized: boolean;
+	lookup?: CacheableLookup['lookup'];
 	[kRequest]: HttpRequestFunction;
 	[kIsNormalizedAlready]?: boolean;
 }
@@ -173,13 +177,19 @@ export interface Progress {
 	total?: number;
 }
 
-export interface Response extends IncomingMessage {
+export interface PlainResponse extends IncomingMessage {
 	requestUrl: string;
 	redirectUrls: string[];
 	request: Request;
 	ip?: string;
 	isFromCache: boolean;
 	statusCode: number;
+}
+
+// For Promise support
+export interface Response<T = unknown> extends PlainResponse {
+	body: T;
+	retryCount: number;
 }
 
 export interface RequestEvents<T> {
@@ -260,13 +270,21 @@ export class RequestError extends Error {
 		});
 
 		if (requestOrResponse instanceof IncomingMessage) {
-			this.response = requestOrResponse;
+			Object.defineProperty(this, 'response', {
+				enumerable: false,
+				value: requestOrResponse
+			});
+
 			requestOrResponse = requestOrResponse.request;
 		}
 
 		if (requestOrResponse instanceof Request) {
-			this.request = requestOrResponse;
-			this.timings = this.request.timings;
+			Object.defineProperty(this, 'request', {
+				enumerable: false,
+				value: requestOrResponse
+			});
+
+			this.timings = requestOrResponse.timings;
 		}
 	}
 }
@@ -633,6 +651,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		assert.any([is.boolean, is.undefined], options.throwHttpErrors);
 		assert.any([is.boolean, is.undefined], options.http2);
 		assert.any([is.boolean, is.undefined], options.allowGetBody);
+		assert.any([is.boolean, is.undefined], options.rejectUnauthorized);
 
 		if (!('followRedirects' in options) && 'followRedirect' in options) {
 			options.followRedirects = options.followRedirect;
@@ -647,6 +666,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		options.throwHttpErrors = Boolean(options.throwHttpErrors);
 		options.http2 = Boolean(options.http2);
 		options.allowGetBody = Boolean(options.allowGetBody);
+		options.allowGetBody = Boolean(options.rejectUnauthorized);
 
 		return options as NormalizedOptions;
 	}
@@ -948,8 +968,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		const fn: RequestFunction<unknown> = options.cacheableRequest ? cacheFn : realFn;
 
-		if (isAgents(options.agent)) {
-			options.agent = options.agent[isHttps ? 'https' : 'http'];
+		if (isAgents(options.agent) && !options.http2) {
+			(options as unknown as RequestOptions).agent = options.agent[isHttps ? 'https' : 'http'];
 		}
 
 		options[kRequest] = realFn as HttpRequestFunction;

@@ -23,6 +23,9 @@ import {
 	BeforeRedirectHook,
 	BeforeErrorHook,
 
+	// Other types to be exported
+	Progress,
+
 	// Types that will not be exported
 	Method,
 	RequestEvents
@@ -30,9 +33,7 @@ import {
 
 export type ResponseType = 'json' | 'buffer' | 'text';
 
-export interface Response<T = unknown> extends RequestResponse {
-	body: T;
-}
+export type Response<T = unknown> = RequestResponse<T>;
 
 export interface RetryObject {
 	attemptCount: number;
@@ -75,7 +76,7 @@ export interface Options extends RequestOptions, PaginationOptions<unknown> {
 	responseType?: ResponseType;
 	resolveBodyOnly?: boolean;
 	methodRewriting?: boolean;
-	retry?: Partial<RequiredRetryOptions>;
+	retry?: Partial<RequiredRetryOptions> | number;
 	isStream?: boolean;
 }
 
@@ -136,4 +137,8 @@ export {
 	BeforeRequestHook,
 	BeforeRedirectHook,
 	BeforeErrorHook
+};
+
+export {
+	Progress
 };

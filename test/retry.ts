@@ -204,7 +204,7 @@ test('doesn\'t retry on 413 with empty statusCodes and methods', withServer, asy
 	const {statusCode, retryCount} = await got({
 		throwHttpErrors: false,
 		retry: {
-			retries: 1,
+			limit: 1,
 			statusCodes: [],
 			methods: []
 		}
@@ -219,7 +219,7 @@ test('doesn\'t retry on 413 with empty methods', withServer, async (t, server, g
 	const {statusCode, retryCount} = await got({
 		throwHttpErrors: false,
 		retry: {
-			retries: 1,
+			limit: 1,
 			statusCodes: [413],
 			methods: []
 		}
