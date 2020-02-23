@@ -260,6 +260,41 @@ const waitForOpenFile = async (file: ReadStream): Promise<void> => new Promise((
 
 const redirectCodes: ReadonlySet<number> = new Set([300, 301, 302, 303, 304, 307, 308]);
 
+type NonEnumerableProperty = 'context' | 'body' | 'json' | 'form';
+const nonEnumerableProperties: NonEnumerableProperty[] = [
+	'context',
+	'body',
+	'json',
+	'form'
+];
+
+const setNonEnumerableProperties = (sources: (Options | Defaults | undefined)[], to: Options): void => {
+	// Non enumerable properties shall not be merged
+	const properties: Partial<{[Key in NonEnumerableProperty]: any}> = {};
+
+	for (const source of sources) {
+		if (!source) {
+			continue;
+		}
+
+		for (const name of nonEnumerableProperties) {
+			if (!(name in source)) {
+				continue;
+			}
+
+			properties[name] = {
+				writable: true,
+				configurable: true,
+				enumerable: false,
+				// @ts-ignore TS doesn't see the check above
+				value: source[name]
+			};
+		}
+	}
+
+	Object.defineProperties(to, properties);
+};
+
 export class RequestError extends Error {
 	code?: string;
 	stack!: string;
@@ -505,7 +540,9 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 
 		// `options.prefixUrl` & `options.url`
-		if (is.string(options.prefixUrl)) {
+		if (is.string(options.prefixUrl) || is.urlInstance(options.prefixUrl)) {
+			options.prefixUrl = options.prefixUrl.toString();
+
 			if (options.prefixUrl !== '' && !options.prefixUrl.endsWith('/')) {
 				options.prefixUrl += '/';
 			}
@@ -636,10 +673,10 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		// `options.context`
 		if (is.undefined(options.context)) {
-			options.context = {};
-		} else if (is.object(options.context)) {
-			options.context = {...options.context};
-		} else {
+			if (!(defaults && defaults.context)) {
+				options.context = {};
+			}
+		} else if (!is.object(options.context)) {
 			throw new TypeError(`Parameter \`context\` must be an object, not ${is('options.context')}`);
 		}
 
@@ -706,6 +743,9 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		options.allowGetBody = Boolean(options.allowGetBody);
 		options.allowGetBody = Boolean(options.rejectUnauthorized);
 
+		// Set non-enumerable properties
+		setNonEnumerableProperties([defaults, options], options);
+
 		return options as NormalizedOptions;
 	}
 
@@ -720,7 +760,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		const isBody = !is.undefined(options.body);
 		const hasPayload = isForm || isJSON || isBody;
 		if (hasPayload) {
-			if (options.method in withoutBody && !(options.method === 'GET' && options.allowGetBody)) {
+			if (withoutBody.has(options.method) && !(options.method === 'GET' && options.allowGetBody)) {
 				throw new TypeError(`The \`${options.method}\` method cannot be used with a body`);
 			}
 
@@ -1106,7 +1146,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 	_write(chunk: any, encoding: string, callback: (error?: Error | null) => void): void {
 		const {options} = this;
-		if (options.method in withoutBody) {
+		if (withoutBody.has(options.method)) {
 			callback(new TypeError(`The \`${options.method}\` method cannot be used with a body`));
 			return;
 		}

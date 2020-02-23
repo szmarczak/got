@@ -152,38 +152,12 @@ export const defaultHandler: HandlerFunction = (options, next) => next(options);
 
 /* MERGE OPTIONS */
 
-type NonEnumerableProperty = 'context' | 'body' | 'json' | 'form';
-const nonEnumerableProperties: NonEnumerableProperty[] = [
-	'context',
-	'body',
-	'json',
-	'form'
-];
-
 export const mergeOptions = (...sources: Options[]): NormalizedOptions => {
 	let mergedOptions = normalizeArguments(undefined, {});
 
-	// Non enumerable properties shall not be merged
-	const properties: Partial<{[Key in NonEnumerableProperty]: any}> = {};
-
 	for (const source of sources) {
 		mergedOptions = normalizeArguments(undefined, source, mergedOptions);
-
-		for (const name of nonEnumerableProperties) {
-			if (!(name in source)) {
-				continue;
-			}
-
-			properties[name] = {
-				writable: true,
-				configurable: true,
-				enumerable: false,
-				value: source[name]
-			};
-		}
 	}
-
-	Object.defineProperties(mergedOptions, properties);
 
 	return mergedOptions;
 };
