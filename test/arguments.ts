@@ -45,13 +45,7 @@ test('throws an error if the protocol is not specified', async t => {
 	});
 
 	await t.throwsAsync(got({}), {
-		instanceOf: TypeError,
-		message: 'No URL protocol specified'
-	});
-
-	await t.throwsAsync(got({}), {
-		instanceOf: TypeError,
-		message: 'No URL protocol specified'
+		message: 'Missing `url` property'
 	});
 });
 

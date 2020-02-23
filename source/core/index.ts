@@ -472,6 +472,10 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 				const {options} = this;
 
+				if (!options.url) {
+					throw new TypeError('Missing `url` property');
+				}
+
 				this.requestUrl = options.url.toString();
 
 				await this.finalizeBody();
@@ -519,8 +523,16 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 
 		// Disallow `options.path` and `options.pathname`
-		if ((options as any).path || (options as any).pathname) {
-			throw new TypeError('Parameters `path` and `pathname` cannot be used');
+		if (
+			'path' in options ||
+			'pathname' in options ||
+			'hostname' in options ||
+			'host' in options ||
+			'port' in options ||
+			'search' in options ||
+			'protocol' in options
+		) {
+			throw new TypeError('The legacy `url.Url` is deprecated. Use `URL` instead.');
 		}
 
 		// `options.method`
