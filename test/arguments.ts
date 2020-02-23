@@ -16,7 +16,7 @@ test('`url` is required', async t => {
 		got(''),
 		{
 			instanceOf: TypeError,
-			message: 'No URL protocol specified'
+			message: 'Invalid URL: '
 		}
 	);
 });
@@ -33,8 +33,7 @@ test('`url` should be utf-8 encoded', async t => {
 test('throws if no arguments provided', async t => {
 	// @ts-ignore Error tests
 	await t.throwsAsync(got(), {
-		instanceOf: TypeError,
-		message: 'Missing `url` argument'
+		message: 'Missing `url` property'
 	});
 });
 
@@ -101,20 +100,6 @@ test('overrides `searchParams` from options', withServer, async (t, server, got)
 		{
 			searchParams: {
 				test: 'wow'
-			},
-			cache: {
-				get(key: string) {
-					t.is(key, `cacheable-request:GET:${server.url}/?test=wow`);
-				},
-				set(key: string) {
-					t.is(key, `cacheable-request:GET:${server.url}/?test=wow`);
-				},
-				delete() {
-					return true;
-				},
-				clear() {
-					return undefined;
-				}
 			}
 		}
 	);
@@ -151,7 +136,6 @@ test('ignores empty searchParams object', withServer, async (t, server, got) => 
 test('throws when passing body with a non payload method', async t => {
 	// @ts-ignore Error tests
 	await t.throwsAsync(got('https://example.com', {body: 'asdf'}), {
-		instanceOf: TypeError,
 		message: 'The `GET` method cannot be used with a body'
 	});
 });
@@ -196,7 +180,6 @@ test('throws TypeError when `options.hooks` is not an object', async t => {
 		// @ts-ignore Error tests
 		got('https://example.com', {hooks: 'not object'}),
 		{
-			instanceOf: TypeError,
 			message: 'Parameter `hooks` must be an Object, not string'
 		}
 	);
@@ -207,7 +190,6 @@ test('throws TypeError when known `options.hooks` value is not an array', async 
 		// @ts-ignore Error tests
 		got('https://example.com', {hooks: {beforeRequest: {}}}),
 		{
-			instanceOf: TypeError,
 			message: 'Parameter `beforeRequest` must be an Array, not Object'
 		}
 	);
@@ -219,7 +201,6 @@ test('throws TypeError when known `options.hooks` array item is not a function',
 		// @ts-ignore Error tests
 		got('https://example.com', {hooks: {beforeRequest: [{}]}}),
 		{
-			instanceOf: TypeError,
 			message: 'hook is not a function'
 		}
 	);
@@ -362,5 +343,5 @@ test('throws if `options.encoding` is `null`', async t => {
 test('`url` option and input argument are mutually exclusive', async t => {
 	await t.throwsAsync(got('https://example.com', {
 		url: 'https://example.com'
-	}), {message: 'The `url` option cannot be used if the input is a valid URL.'});
+	}), {message: 'The `url` option is mutually exclusive with the `input` argument'});
 });

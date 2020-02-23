@@ -477,6 +477,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				}
 
 				this.requestUrl = options.url.toString();
+				decodeURI(this.requestUrl);
 
 				await this.finalizeBody();
 
@@ -519,6 +520,10 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		if (is.object(url) && !is.urlInstance(url)) {
 			options = {...defaults as NormalizedOptions, ...(url as Options)};
 		} else {
+			if (url && options && options.url) {
+				throw new TypeError('The `url` option is mutually exclusive with the `input` argument');
+			}
+
 			options = {...defaults as NormalizedOptions, ...options, url};
 		}
 
@@ -576,8 +581,24 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			options.url = new URL(options.url);
 		}
 
-		// Protocol check
 		if (options.url) {
+			// Make it possible to change `options.prefixUrl`
+			let prefixUrl = options.prefixUrl as string;
+			Object.defineProperty(options, 'prefixUrl', {
+				set: (value: string) => {
+					const url = options!.url as URL;
+
+					if (!url.href.startsWith(value)) {
+						throw new Error(`Cannot change \`prefixUrl\` from ${prefixUrl} to ${value}: ${url.href}`);
+					}
+
+					options!.url = new URL(value + url.href.slice(prefixUrl.length));
+					prefixUrl = value;
+				},
+				get: () => prefixUrl
+			});
+
+			// Protocol check
 			const {protocol} = options.url;
 
 			if (protocol !== 'http:' && protocol !== 'https:') {
@@ -637,9 +658,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			}
 
 			if (options.url) {
-				options.searchParams.forEach((value, key) => {
-					(options!.url as URL).searchParams.append(key, value);
-				});
+				(options.url as URL).search = options.searchParams.toString();
 			}
 		} else if (!is.undefined(options.searchParams)) {
 			throw new TypeError(`Parameter \`searchParams\` must be an object or a string, not ${is(options.searchParams)}`);
@@ -704,14 +723,14 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 						// See https://github.com/microsoft/TypeScript/issues/31445#issuecomment-576929044
 						(options.hooks as any)[event] = [...options.hooks[event]!];
 					} else {
-						throw new TypeError(`Parameter \`${event}\` must be an array, not ${is(options.hooks[event])}`);
+						throw new TypeError(`Parameter \`${event}\` must be an Array, not ${is(options.hooks[event])}`);
 					}
 				} else {
 					options.hooks[event] = [];
 				}
 			}
 		} else {
-			throw new TypeError(`Parameter \`hooks\` must be an object, not ${is(options.hooks)}`);
+			throw new TypeError(`Parameter \`hooks\` must be an Object, not ${is(options.hooks)}`);
 		}
 
 		if (defaults) {
@@ -727,6 +746,10 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 
 		// Other options
+		if (is.null_(options.encoding)) {
+			throw new TypeError('To get a Buffer, set `options.responseType` to `buffer` instead');
+		}
+
 		assert.any([is.boolean, is.undefined], options.decompress);
 		assert.any([is.boolean, is.undefined], options.ignoreInvalidCookies);
 		assert.any([is.string, is.undefined], options.encoding);
@@ -755,7 +778,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		options.throwHttpErrors = Boolean(options.throwHttpErrors);
 		options.http2 = Boolean(options.http2);
 		options.allowGetBody = Boolean(options.allowGetBody);
-		options.allowGetBody = Boolean(options.rejectUnauthorized);
+		options.rejectUnauthorized = Boolean(options.rejectUnauthorized);
 
 		// Set non-enumerable properties
 		setNonEnumerableProperties([defaults, options], options);
@@ -773,8 +796,9 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		const isJSON = !is.undefined(options.json);
 		const isBody = !is.undefined(options.body);
 		const hasPayload = isForm || isJSON || isBody;
+		const cannotHaveBody = withoutBody.has(options.method) && !(options.method === 'GET' && options.allowGetBody);
 		if (hasPayload) {
-			if (withoutBody.has(options.method) && !(options.method === 'GET' && options.allowGetBody)) {
+			if (cannotHaveBody) {
 				throw new TypeError(`The \`${options.method}\` method cannot be used with a body`);
 			}
 
@@ -868,6 +892,10 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 
 		this[kBodySize] = Number(headers['content-length']) || undefined;
+
+		if (cannotHaveBody) {
+			this.end();
+		}
 	}
 
 	async _onResponse(response: IncomingMessage): Promise<void> {
