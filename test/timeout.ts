@@ -133,11 +133,13 @@ test.serial('send timeout (keepalive)', withServerAndLolex, async (t, server, go
 		response.end('ok');
 	});
 
-	await got('prime', {agent: keepAliveAgent});
+	await got('prime', {agent: {http: keepAliveAgent}});
 
 	await t.throwsAsync(
 		got.post({
-			agent: keepAliveAgent,
+			agent: {
+				http: keepAliveAgent
+			},
 			timeout: {send: 1},
 			retry: 0,
 			body: slowDataStream(clock)
@@ -198,10 +200,12 @@ test.serial('response timeout (keepalive)', withServerAndLolex, async (t, server
 		response.end('ok');
 	});
 
-	await got('prime', {agent: keepAliveAgent});
+	await got('prime', {agent: {http: keepAliveAgent}});
 
 	const request = got({
-		agent: keepAliveAgent,
+		agent: {
+			http: keepAliveAgent
+		},
 		timeout: {response: 1},
 		retry: 0
 	}).on('request', (request: http.ClientRequest) => {
@@ -348,9 +352,9 @@ test.serial('lookup timeout no error (keepalive)', withServerAndLolex, async (t,
 		response.end('ok');
 	});
 
-	await got('prime', {agent: keepAliveAgent});
+	await got('prime', {agent: {http: keepAliveAgent}});
 	await t.notThrowsAsync(got({
-		agent: keepAliveAgent,
+		agent: {http: keepAliveAgent},
 		timeout: {lookup: 1},
 		retry: 0
 	}).on('request', (request: http.ClientRequest) => {
@@ -516,7 +520,7 @@ test.serial('no memory leak when using socket timeout and keepalive agent', with
 	server.get('/', defaultHandler(clock));
 
 	const promise = got({
-		agent: keepAliveAgent,
+		agent: {http: keepAliveAgent},
 		timeout: {socket: requestDelay * 2}
 	});
 
