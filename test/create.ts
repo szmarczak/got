@@ -144,7 +144,7 @@ test('can set defaults to `got.mergeOptions(...)`', t => {
 		});
 	});
 
-	t.true(instance.defaults.options.followRedirect);
+	t.true(instance.defaults.options.followRedirects);
 });
 
 test('can set mutable defaults using got.extend', t => {
@@ -154,10 +154,10 @@ test('can set mutable defaults using got.extend', t => {
 	});
 
 	t.notThrows(() => {
-		instance.defaults.options.followRedirect = true;
+		instance.defaults.options.followRedirects = true;
 	});
 
-	t.true(instance.defaults.options.followRedirect);
+	t.true(instance.defaults.options.followRedirects);
 });
 
 test('only plain objects are freezed', withServer, async (t, server, got) => {

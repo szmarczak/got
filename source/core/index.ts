@@ -152,7 +152,6 @@ export interface NormalizedOptions extends Options {
 	context: object;
 	hooks: Required<Hooks>;
 	followRedirects: boolean;
-	followRedirect: boolean;
 	maxRedirects: number;
 	throwHttpErrors: boolean;
 	dnsCache?: CacheableLookup;
@@ -176,7 +175,7 @@ export interface Defaults {
 	dnsCache?: CacheableLookup;
 	headers: Headers;
 	hooks: Required<Hooks>;
-	followRedirect: boolean;
+	followRedirects: boolean;
 	maxRedirects: number;
 	cache?: string | CacheableRequest.StorageAdapter;
 	throwHttpErrors: boolean;
@@ -474,6 +473,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	}
 
 	static normalizeArguments(url?: string | URL, options?: Options, defaults?: Defaults): NormalizedOptions {
+		const rawOptions = options;
+
 		if (is.object(url) && !is.urlInstance(url)) {
 			options = {...defaults as NormalizedOptions, ...(url as Options)};
 		} else {
@@ -515,6 +516,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				}
 
 				options.url = new URL(options.prefixUrl + options.url);
+			} else if (is.undefined(options.url) && options.prefixUrl !== '') {
+				options.url = new URL(options.prefixUrl);
 			}
 		} else if (!is.undefined(options.prefixUrl)) {
 			throw new TypeError(`Parameter \`prefixUrl\` must be a string, not ${is(options.prefixUrl)}`);
@@ -523,9 +526,12 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 
 		// Protocol check
-		const {protocol} = options.url!;
-		if (protocol !== 'http:' && protocol !== 'https:') {
-			throw new UnsupportedProtocolError(options as NormalizedOptions);
+		if (options.url) {
+			const {protocol} = options.url;
+
+			if (protocol !== 'http:' && protocol !== 'https:') {
+				throw new UnsupportedProtocolError(options as NormalizedOptions);
+			}
 		}
 
 		// `options.username` & `options.password`
@@ -681,16 +687,19 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		assert.any([is.boolean, is.undefined], options.allowGetBody);
 		assert.any([is.boolean, is.undefined], options.rejectUnauthorized);
 
-		if (!('followRedirects' in options) && 'followRedirect' in options) {
-			options.followRedirects = options.followRedirect;
-		} else if ('followRedirects' in options && 'followRedirect' in options) {
+		if ('followRedirects' in options && 'followRedirect' in options) {
 			throw new TypeError('Parameters `followRedirects` and `followRedirect` are mutually exclusive');
+		}
+
+		if (rawOptions && !('followRedirects' in options) && 'followRedirect' in rawOptions) {
+			options.followRedirects = rawOptions.followRedirect;
+
+			delete options.followRedirect;
 		}
 
 		options.decompress = Boolean(options.decompress);
 		options.ignoreInvalidCookies = Boolean(options.ignoreInvalidCookies);
 		options.followRedirects = Boolean(options.followRedirects);
-		options.followRedirect = options.followRedirects;
 		options.maxRedirects = options.maxRedirects ?? 0;
 		options.throwHttpErrors = Boolean(options.throwHttpErrors);
 		options.http2 = Boolean(options.http2);
