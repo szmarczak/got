@@ -92,15 +92,6 @@ test('`searchParams` option', withServer, async (t, server, got) => {
 	t.is((await got({searchParams: 'recent=true'})).body, 'recent');
 });
 
-test('response has `requestUrl` property even if `url` is an object', withServer, async (t, server, got) => {
-	server.get('/', (_request, response) => {
-		response.end('ok');
-	});
-
-	t.is((await got({hostname: server.hostname, port: server.port})).requestUrl, `${server.url}/`);
-	t.is((await got({hostname: server.hostname, port: server.port, protocol: 'http:'})).requestUrl, `${server.url}/`);
-});
-
 test('response contains url', withServer, async (t, server, got) => {
 	server.get('/', (_request, response) => {
 		response.end('ok');

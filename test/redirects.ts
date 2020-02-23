@@ -115,16 +115,6 @@ test('searchParams are not breaking redirects', withServer, async (t, server, go
 	t.is((await got('relativeSearchParam', {searchParams: 'bang=1'})).body, 'reached');
 });
 
-test('hostname + pathname are not breaking redirects', withServer, async (t, server, got) => {
-	server.get('/', reachedHandler);
-	server.get('/relative', relativeHandler);
-
-	t.is((await got('relative', {
-		hostname: server.hostname,
-		pathname: '/relative'
-	})).body, 'reached');
-});
-
 test('redirects GET and HEAD requests', withServer, async (t, server, got) => {
 	server.get('/', (_request, response) => {
 		response.writeHead(308, {

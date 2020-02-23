@@ -252,7 +252,7 @@ test.serial('connect timeout', withServerAndLolex, async (t, _server, got, clock
 test.serial('connect timeout (ip address)', withServerAndLolex, async (t, _server, got, clock) => {
 	await t.throwsAsync(
 		got({
-			hostname: '127.0.0.1',
+			url: 'http://example.com',
 			createConnection: options => {
 				const socket = new net.Socket(options as object as net.SocketConstructorOpts);
 				// @ts-ignore We know that it is readonly, but we have to test it
@@ -340,7 +340,7 @@ test.serial('lookup timeout no error (ip address)', withServerAndLolex, async (t
 	server.get('/', defaultHandler(clock));
 
 	await t.notThrowsAsync(got({
-		hostname: '127.0.0.1',
+		url: 'http://127.0.0.1',
 		timeout: {lookup: 1},
 		retry: 0
 	}));

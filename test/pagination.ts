@@ -1,3 +1,4 @@
+import {URL} from 'url';
 import test from 'ava';
 import got, {Response} from '../source';
 import withServer from './helpers/with-server';
@@ -109,11 +110,15 @@ test('custom paginate function', withServer, async (t, server, got) => {
 	const result = await got.paginate.all({
 		_pagination: {
 			paginate: response => {
-				if (response.request.options.path === '/?page=3') {
+				const url = new URL(response.url);
+
+				if (url.pathname === '/?page=3') {
 					return false;
 				}
 
-				return {path: '/?page=3'};
+				url.pathname = '/?page=3';
+
+				return {url};
 			}
 		}
 	});

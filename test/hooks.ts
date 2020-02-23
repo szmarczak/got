@@ -1,3 +1,4 @@
+import {URL} from 'url';
 import test from 'ava';
 import getStream from 'get-stream';
 import delay = require('delay');
@@ -673,9 +674,9 @@ test('does not break on `afterResponse` hook with JSON mode', withServer, async 
 			afterResponse: [
 				(response, retryWithMergedOptions) => {
 					if (response.statusCode === 404) {
-						return retryWithMergedOptions({
-							path: '/foobar'
-						});
+						const url = new URL('/foobar', response.url);
+
+						return retryWithMergedOptions({url});
 					}
 
 					return response;

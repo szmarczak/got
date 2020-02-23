@@ -43,10 +43,8 @@ test('does not remove user headers from `url` object argument', withServer, asyn
 	server.get('/', echoHeaders);
 
 	const headers = (await got<Headers>({
-		hostname: server.hostname,
-		port: server.port,
+		url: `http://${server.hostname}:${server.port}`,
 		responseType: 'json',
-		protocol: 'http:',
 		headers: {
 			'X-Request-Id': 'value'
 		}

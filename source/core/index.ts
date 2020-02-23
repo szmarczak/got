@@ -3,6 +3,7 @@ import {Duplex, Writable, Readable} from 'stream';
 import {ReadStream} from 'fs';
 import {URL} from 'url';
 import {Socket} from 'net';
+import {SecureContextOptions} from 'tls';
 import http = require('http');
 import {ClientRequest, RequestOptions, IncomingMessage, ServerResponse, request as httpRequest} from 'http';
 import https = require('https');
@@ -101,7 +102,7 @@ export type RequestFunction<T = IncomingMessage | ResponseLike> = (url: URL, opt
 
 export type Headers = Record<string, string | string[] | undefined>;
 
-export interface Options extends Omit<RequestOptions, 'agent' | 'timeout' | 'path' | 'auth' | 'headers'> {
+export interface Options extends SecureContextOptions {
 	request?: RequestFunction;
 	agent?: Agents | false;
 	decompress?: boolean;
@@ -130,6 +131,12 @@ export interface Options extends Omit<RequestOptions, 'agent' | 'timeout' | 'pat
 	lookup?: CacheableLookup['lookup'];
 	rejectUnauthorized?: boolean;
 	headers?: Headers;
+
+	// From http.RequestOptions
+	localAddress?: string;
+	socketPath?: string;
+	method?: string;
+	createConnection?: (options: http.RequestOptions, oncreate: (error: Error, socket: Socket) => void) => Socket;
 }
 
 export interface NormalizedOptions extends Options {
