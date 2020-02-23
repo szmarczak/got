@@ -452,13 +452,15 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				}
 
 				const initHooks = nonNormalizedOptions.hooks?.init;
-				if (initHooks) {
-					nonNormalizedOptions = {...nonNormalizedOptions, url};
+				if (initHooks && initHooks.length !== 0) {
+					nonNormalizedOptions.url = url;
 
 					for (const hook of initHooks) {
 						// eslint-disable-next-line no-await-in-loop
 						await hook(nonNormalizedOptions as Options & {url: string | URL});
 					}
+
+					nonNormalizedOptions.url = undefined;
 				}
 
 				if (kIsNormalizedAlready in nonNormalizedOptions) {

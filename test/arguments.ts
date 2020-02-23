@@ -339,7 +339,6 @@ test.only('`context` option is accessible when using hooks', withServer, async (
 		hooks: {
 			beforeRequest: [
 				options => {
-					console.log(options.context);
 					t.is(options.context, context);
 					t.false({}.propertyIsEnumerable.call(options, 'context'));
 				}
