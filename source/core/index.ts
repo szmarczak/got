@@ -268,7 +268,7 @@ const nonEnumerableProperties: NonEnumerableProperty[] = [
 	'form'
 ];
 
-const setNonEnumerableProperties = (sources: (Options | Defaults | undefined)[], to: Options): void => {
+const setNonEnumerableProperties = (sources: Array<Options | Defaults | undefined>, to: Options): void => {
 	// Non enumerable properties shall not be merged
 	const properties: Partial<{[Key in NonEnumerableProperty]: any}> = {};
 
@@ -675,7 +675,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		// `options.context`
 		if (is.undefined(options.context)) {
-			if (!(defaults && defaults.context)) {
+			if (!defaults?.context) {
 				options.context = {};
 			}
 		} else if (!is.object(options.context)) {

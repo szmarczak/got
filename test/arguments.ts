@@ -327,7 +327,7 @@ test('`context` option is not enumerable', withServer, async (t, server, got) =>
 	});
 });
 
-test.only('`context` option is accessible when using hooks', withServer, async (t, server, got) => {
+test('`context` option is accessible when using hooks', withServer, async (t, server, got) => {
 	server.get('/', echoUrl);
 
 	const context = {
