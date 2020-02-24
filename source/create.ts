@@ -18,6 +18,7 @@ import Request, {
 	HTTPError,
 	MaxRedirectsError,
 	TimeoutError,
+	UnsupportedProtocolError,
 	kIsNormalizedAlready
 } from './core';
 import deepFreeze from './utils/deep-freeze';
@@ -37,7 +38,8 @@ const errors = {
 	MaxRedirectsError,
 	TimeoutError,
 	ParseError,
-	CancelError
+	CancelError,
+	UnsupportedProtocolError
 };
 
 const {normalizeArguments} = PromisableRequest;
