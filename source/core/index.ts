@@ -15,6 +15,7 @@ import CacheableRequest = require('cacheable-request');
 import http2wrapper = require('http2-wrapper');
 import lowercaseKeys = require('lowercase-keys');
 import ResponseLike = require('responselike');
+import getStream = require('get-stream');
 import is, {assert} from '@sindresorhus/is';
 import getBodySize from '../utils/get-body-size';
 import isFormData from '../utils/is-form-data';
@@ -922,7 +923,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		typedResponse.redirectUrls = this.redirects;
 		typedResponse.request = this;
 		typedResponse.isFromCache = (response as any).fromCache || false;
-		typedResponse.ip = typedResponse.isFromCache ? undefined : response.socket.remoteAddress!;
+		typedResponse.ip = typedResponse.isFromCache ? undefined : response.socket.remoteAddress;
 
 		this[kIsFromCache] = typedResponse.isFromCache;
 
@@ -1192,6 +1193,10 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 	async _beforeError(error: RequestError): Promise<void> {
 		try {
+			if (error.response) {
+				error.response.body = await getStream(error.response);
+			}
+
 			for (const hook of this.options.hooks.beforeError) {
 				// eslint-disable-next-line no-await-in-loop
 				error = await hook(error);

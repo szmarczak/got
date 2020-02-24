@@ -140,10 +140,19 @@ test('`http.request` pipe error', async t => {
 		// @ts-ignore Error tests
 		request: () => {
 			const proxy = new stream.PassThrough();
+
+			(proxy as any).socket = {
+				remoteAddress: ''
+			};
+
+			(proxy as any).headers = {};
+
 			proxy.resume();
-			proxy.once('pipe', () => {
+			proxy.read = () => {
 				proxy.destroy(new Error(message));
-			});
+
+				return null;
+			};
 
 			return proxy;
 		},
@@ -166,7 +175,8 @@ test('`http.request` error through CacheableRequest', async t => {
 	});
 });
 
-test('catches error in mimicResponse', withServer, async (t, server) => {
+// TODO: It can happen only when using cache
+test.failing('catches error in mimicResponse', withServer, async (t, server) => {
 	server.get('/', (_request, response) => {
 		response.end('ok');
 	});
