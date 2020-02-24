@@ -42,6 +42,10 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 
 	const promise = new PCancelable<T>((resolve, reject, onCancel) => {
 		const makeRequest = (): void => {
+			if (options.responseType === 'json' && options.headers.accept === undefined) {
+				options.headers.accept = 'application/json';
+			}
+
 			const request = new PromisableRequest(options.url, options);
 			onCancel(() => request.destroy());
 

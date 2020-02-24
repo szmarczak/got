@@ -185,11 +185,11 @@ test('buffer as `options.body` sets `content-length` header', withServer, async 
 test('throws on null value headers', async t => {
 	// @ts-ignore Error tests
 	await t.throwsAsync(got({
+		url: 'https://example.com',
 		headers: {
 			'user-agent': null
 		}
 	}), {
-		instanceOf: TypeError,
 		message: 'Use `undefined` instead of `null` to delete the `user-agent` header'
 	});
 });

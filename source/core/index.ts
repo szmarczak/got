@@ -348,6 +348,20 @@ export class RequestError extends Error {
 
 			this.timings = requestOrResponse.timings;
 		}
+
+		// Recover the original stacktrace
+		if (!is.undefined(error.stack)) {
+			const indexOfMessage = this.stack.indexOf(this.message) + this.message.length;
+			const thisStackTrace = this.stack.slice(indexOfMessage).split('\n').reverse();
+			const errorStackTrace = error.stack.slice(error.stack.indexOf(error.message!) + error.message!.length).split('\n').reverse();
+
+			// Remove duplicated traces
+			while (errorStackTrace.length !== 0 && errorStackTrace[0] === thisStackTrace[0]) {
+				thisStackTrace.shift();
+			}
+
+			this.stack = `${this.stack.slice(0, indexOfMessage)}${thisStackTrace.reverse().join('\n')}${errorStackTrace.reverse().join('\n')}`;
+		}
 	}
 }
 
@@ -501,7 +515,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 				await this.makeRequest();
 
-				if (options.body instanceof Readable) {
+				if (is.nodeStream(options.body)) {
 					options.body.pipe(this);
 					options.body.once('error', (error: NodeJS.ErrnoException) => {
 						this._beforeError(new UploadError(error, options, this));
@@ -897,10 +911,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 						headers['content-length'] = String(uploadBodySize);
 					}
 				}
-
-				if (options.decompress && is.undefined(headers['accept-encoding'])) {
-					headers['accept-encoding'] = supportsBrotli ? 'gzip, deflate, br' : 'gzip, deflate';
-				}
 			}
 		}
 
@@ -1067,7 +1077,13 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			if (is.undefined(headers[key])) {
 				// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
 				delete headers[key];
+			} else if (is.null_(headers[key])) {
+				throw new TypeError(`Use \`undefined\` instead of \`null\` to delete the \`${key}\` header`);
 			}
+		}
+
+		if (options.decompress && is.undefined(headers['accept-encoding'])) {
+			headers['accept-encoding'] = supportsBrotli ? 'gzip, deflate, br' : 'gzip, deflate';
 		}
 
 		// Set cookies
