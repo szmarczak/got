@@ -79,7 +79,6 @@ export interface Options extends RequestOptions, PaginationOptions<unknown> {
 	hooks?: Hooks;
 	responseType?: ResponseType;
 	resolveBodyOnly?: boolean;
-	methodRewriting?: boolean;
 	retry?: Partial<RequiredRetryOptions> | number;
 	isStream?: boolean;
 }
@@ -88,7 +87,6 @@ export interface NormalizedOptions extends RequestNormalizedOptions {
 	hooks: Required<Hooks>;
 	responseType: ResponseType;
 	resolveBodyOnly: boolean;
-	methodRewriting: boolean;
 	retry: RequiredRetryOptions;
 	isStream: boolean;
 	_pagination?: Required<PaginationOptions<unknown>['_pagination']>;
@@ -98,7 +96,6 @@ export interface Defaults extends RequestDefaults {
 	hooks: Required<Hooks>;
 	responseType: ResponseType;
 	resolveBodyOnly: boolean;
-	methodRewriting: boolean;
 	retry: RequiredRetryOptions;
 	isStream: boolean;
 	_pagination?: Required<PaginationOptions<unknown>['_pagination']>;

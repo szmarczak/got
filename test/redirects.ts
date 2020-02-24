@@ -272,7 +272,7 @@ test('throws on malformed redirect URI', withServer, async (t, server, got) => {
 	});
 
 	await t.throwsAsync(got(''), {
-		name: 'URIError'
+		message: 'URI malformed'
 	});
 });
 
@@ -375,7 +375,7 @@ test('body is passed on POST redirect', withServer, async (t, server, got) => {
 	t.is(body, 'foobar');
 });
 
-test('method overwriting can be turned off', withServer, async (t, server, got) => {
+test.only('method rewriting can be turned off', withServer, async (t, server, got) => {
 	server.post('/redirect', (_request, response) => {
 		response.writeHead(302, {
 			location: '/'

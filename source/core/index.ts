@@ -132,6 +132,7 @@ export interface Options extends SecureContextOptions {
 	lookup?: CacheableLookup['lookup'];
 	rejectUnauthorized?: boolean;
 	headers?: Headers;
+	methodRewriting?: boolean;
 
 	// From http.RequestOptions
 	localAddress?: string;
@@ -161,6 +162,7 @@ export interface NormalizedOptions extends Options {
 	allowGetBody: boolean;
 	rejectUnauthorized: boolean;
 	lookup?: CacheableLookup['lookup'];
+	methodRewriting: boolean;
 	[kRequest]: HttpRequestFunction;
 	[kIsNormalizedAlready]?: boolean;
 }
@@ -184,6 +186,7 @@ export interface Defaults {
 	http2: boolean;
 	allowGetBody: boolean;
 	rejectUnauthorized: boolean;
+	methodRewriting: boolean;
 
 	// Optional
 	agent?: Agents | false;
@@ -232,6 +235,10 @@ function validateSearchParams(searchParams: Record<string, unknown>): asserts se
 			throw new TypeError(`The \`searchParams\` value '${String(value)}' must be a string, number, boolean or null`);
 		}
 	}
+}
+
+function isClientRequest(clientRequest: unknown): clientRequest is ClientRequest {
+	return is.object(clientRequest) && !('statusCode' in clientRequest);
 }
 
 const cacheFn = async (url: URL, options: RequestOptions): Promise<ClientRequest | ResponseLike> => new Promise<ClientRequest | ResponseLike>((resolve, reject) => {
@@ -514,16 +521,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				}
 
 				await this.makeRequest();
-
-				if (is.nodeStream(options.body)) {
-					options.body.pipe(this);
-					options.body.once('error', (error: NodeJS.ErrnoException) => {
-						this._beforeError(new UploadError(error, options, this));
-					});
-				} else if (options.body) {
-					this._writeRequest(options.body, null as unknown as string, () => {});
-					this.end();
-				}
 
 				this.finalized = true;
 				this.emit('finalized');
@@ -915,9 +912,21 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 
 		this[kBodySize] = Number(headers['content-length']) || undefined;
+	}
 
-		if (cannotHaveBody) {
-			this.end();
+	_deleteBody() {
+		const {options} = this;
+
+		if ('body' in options) {
+			delete options.body;
+		}
+
+		if ('json' in options) {
+			delete options.json;
+		}
+
+		if ('form' in options) {
+			delete options.form;
 		}
 	}
 
@@ -964,6 +973,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				// Server responded with "see other", indicating that the resource exists at another location,
 				// and the client should request it from that location via GET or HEAD.
 				options.method = 'GET';
+
+				this._deleteBody();
 			}
 
 			if (this.redirects.length >= options.maxRedirects) {
@@ -971,26 +982,28 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				return;
 			}
 
-			// Handles invalid URLs. See https://github.com/sindresorhus/got/issues/604
-			const redirectBuffer = Buffer.from(response.headers.location, 'binary').toString();
-			const redirectUrl = new URL(redirectBuffer, url);
-
-			// Redirecting to a different site, clear cookies.
-			if (redirectUrl.hostname !== url.hostname && 'cookie' in options.headers) {
-				delete options.headers.cookie;
-			}
-
-			this.redirects.push(redirectUrl.toString());
-			options.url = redirectUrl;
-
-			for (const hook of options.hooks.beforeRedirect) {
-				// eslint-disable-next-line no-await-in-loop
-				await hook(options, typedResponse);
-			}
-
-			this.emit('redirect', typedResponse, options);
-
 			try {
+				// Handles invalid URLs. See https://github.com/sindresorhus/got/issues/604
+				const redirectBuffer = Buffer.from(response.headers.location, 'binary').toString();
+				const redirectUrl = new URL(redirectBuffer, url);
+				const redirectString = redirectUrl.toString();
+				decodeURI(redirectString);
+
+				// Redirecting to a different site, clear cookies.
+				if (redirectUrl.hostname !== url.hostname && 'cookie' in options.headers) {
+					delete options.headers.cookie;
+				}
+
+				this.redirects.push(redirectString);
+				options.url = redirectUrl;
+
+				for (const hook of options.hooks.beforeRedirect) {
+					// eslint-disable-next-line no-await-in-loop
+					await hook(options, typedResponse);
+				}
+
+				this.emit('redirect', typedResponse, options);
+
 				await this.makeRequest();
 			} catch (error) {
 				this._beforeError(error);
@@ -1004,7 +1017,9 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			return;
 		}
 
-		if (options.throwHttpErrors && statusCode !== 304 && (statusCode < 200 || statusCode > 299)) {
+		const limitStatusCode = options.followRedirect ? 299 : 399;
+		const isOk = (statusCode >= 200 && statusCode <= limitStatusCode) || statusCode === 304;
+		if (options.throwHttpErrors && !isOk) {
 			this._beforeError(new HTTPError(typedResponse, options));
 			return;
 		}
@@ -1158,7 +1173,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			options.timeout = timeout;
 			options.agent = agent;
 
-			if (requestOrResponse instanceof ClientRequest) {
+			if (isClientRequest(requestOrResponse)) {
 				timer(requestOrResponse);
 
 				if (timeout) {
@@ -1190,6 +1205,39 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				]);
 
 				this[kRequest] = requestOrResponse;
+
+				// Send body
+				const hasRedirects = this.redirects.length !== 0;
+				if (!options.methodRewriting && hasRedirects) {
+					requestOrResponse.method = 'GET';
+					options.method = 'GET';
+
+					this._deleteBody();
+
+					requestOrResponse.end();
+				} else {
+					if (is.nodeStream(options.body)) {
+						options.body.pipe(this);
+						options.body.once('error', (error: NodeJS.ErrnoException) => {
+							this._beforeError(new UploadError(error, options, this));
+						});
+
+						options.body.once('end', () => {
+							delete options.body;
+						});
+					} else {
+						if (options.body) {
+							this._writeRequest(options.body, null as unknown as string, () => {});
+						}
+
+						if (hasRedirects) {
+							requestOrResponse.end();
+						} else {
+							this.end();
+						}
+					}
+				}
+
 				this.emit('request', requestOrResponse);
 			} else if (is.undefined(requestOrResponse)) {
 				// Fallback to http(s).request
