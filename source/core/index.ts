@@ -942,7 +942,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			}
 		}
 
-		if (options.followRedirects && response.headers.location && redirectCodes.has(statusCode)) {
+		if (options.followRedirect && response.headers.location && redirectCodes.has(statusCode)) {
 			response.resume(); // We're being redirected, we don't care about the response.
 
 			// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -1002,10 +1002,22 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			response = decompressResponse(response);
 		}
 
-		// We don't need to listen for the `readable` response event and execute `this._read()`,
-		// because `response.readableFlowing` is `null` by default.
-		// This allows us to proxy read requests seamlessly.
-		// See https://nodejs.org/api/stream.html#stream_three_states
+		// We need to call `_read()` only when the Request stream is flowing
+		response.once('readable', () => {
+			if ((this as any).readableFlowing) {
+				this._read();
+
+				response.resume();
+			}
+		});
+
+		this.on('resume', () => {
+			response.resume();
+		});
+
+		this.on('pause', () => {
+			response.pause();
+		});
 
 		response.once('end', () => {
 			this[kResponseSize] = this[kDownloadedSize];
