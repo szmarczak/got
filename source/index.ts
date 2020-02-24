@@ -83,6 +83,12 @@ const got = create(defaults);
 
 export default got;
 
+// TODO:
+// - fix test/hooks.ts
+// - fix test/pagination.ts
+// - fix test/post.ts
+// - fix test/progress.ts
+
 // For CommonJS default export support
 module.exports = got;
 module.exports.default = got;

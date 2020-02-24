@@ -1190,6 +1190,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				]);
 
 				this[kRequest] = requestOrResponse;
+				this.emit('request', requestOrResponse);
 			} else if (is.undefined(requestOrResponse)) {
 				// Fallback to http(s).request
 				throw new Error('Fallback to `http.request` not implemented yet');
