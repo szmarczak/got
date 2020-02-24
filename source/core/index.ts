@@ -233,6 +233,9 @@ const cacheFn = async (url: URL, options: RequestOptions): Promise<ClientRequest
 	// TODO: `cacheable-request` is incorrectly typed
 	const cacheRequest = (options as Pick<NormalizedOptions, 'cacheableRequest'>).cacheableRequest!(options, resolve as any);
 
+	// Restore options
+	(options as unknown as NormalizedOptions).url = url;
+
 	cacheRequest.once('error', (error: Error) => {
 		if (error instanceof CacheableRequest.RequestError) {
 			// TODO: `options` should be `normalizedOptions`
@@ -518,7 +521,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		const rawOptions = options;
 
 		if (is.object(url) && !is.urlInstance(url)) {
-			options = {...defaults as NormalizedOptions, ...(url as Options)};
+			options = {...defaults as NormalizedOptions, ...(url as Options), ...options};
 		} else {
 			if (url && options && options.url) {
 				throw new TypeError('The `url` option is mutually exclusive with the `input` argument');
@@ -958,7 +961,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				return;
 			}
 
-			if (options.method === 'GET' || options.method === 'HEAD') {
+			if (kRequest in this && (options.method === 'GET' || options.method === 'HEAD')) {
 				this[kRequest].end();
 			}
 
@@ -990,13 +993,10 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			response = decompressResponse(response);
 		}
 
-		response.on('readable', () => {
-			if (this.isPaused()) {
-				return;
-			}
-
-			this._read();
-		});
+		// We don't need to listen for the `readable` response event and execute `this._read()`,
+		// because `response.readableFlowing` is `null` by default.
+		// This allows us to proxy read requests seamlessly.
+		// See https://nodejs.org/api/stream.html#stream_three_states
 
 		response.once('end', () => {
 			this[kResponseSize] = this[kDownloadedSize];
@@ -1106,6 +1106,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		try {
 			requestOrResponse = await fn(url, options as unknown as RequestOptions);
 
+			// Restore options
 			options.request = request;
 			options.timeout = timeout;
 			options.agent = agent;
@@ -1151,6 +1152,10 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				this._onResponse(requestOrResponse as unknown as IncomingMessage);
 			}
 		} catch (error) {
+			if (error instanceof CacheError) {
+				throw error;
+			}
+
 			throw new RequestError(error.message, error, options, this);
 		}
 	}

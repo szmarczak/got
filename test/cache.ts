@@ -4,6 +4,7 @@ import getStream = require('get-stream');
 import {Handler} from 'express';
 import {Response} from '../source';
 import withServer from './helpers/with-server';
+import CacheableLookup from 'cacheable-lookup';
 
 const cacheEndpoint: Handler = (_request, response) => {
 	response.setHeader('Cache-Control', 'public, max-age=60');
@@ -135,10 +136,10 @@ test('doesn\'t cache response when received HTTP error', withServer, async (t, s
 });
 
 test('DNS cache works', withServer, async (t, _server, got) => {
-	const map = new Map();
-	await t.notThrowsAsync(got('https://example.com', {dnsCache: true, prefixUrl: ''}));
+	const cache = new CacheableLookup();
+	await t.notThrowsAsync(got('https://example.com', {dnsCache: cache, prefixUrl: ''}));
 
-	t.is(map.size, 1);
+	t.is((cache as any)._cache.size, 1);
 });
 
 test('`isFromCache` stream property is undefined before the `response` event', withServer, async (t, server, got) => {

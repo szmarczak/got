@@ -317,7 +317,7 @@ const create = (defaults: InstanceDefaults): Got => {
 		got[method] = ((url: string | URL, options?: Options): GotReturn => got(url, {...options, method})) as GotRequest;
 
 		got.stream[method] = ((url: string | URL, options?: Options & {isStream: true}) => {
-			return got.stream(url, {...options, method});
+			return got(url, {...options, method, isStream: true});
 		}) as GotStream;
 	}
 
