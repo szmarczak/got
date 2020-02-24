@@ -1039,7 +1039,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 
 		const {options} = this;
-		const {url, headers} = options;
+		const {url, headers, request, agent, timeout} = options;
 
 		for (const key in headers) {
 			if (is.undefined(headers[key])) {
@@ -1052,14 +1052,14 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			// eslint-disable-next-line no-await-in-loop
 			const result = await hook(options);
 
-			if (result instanceof ResponseLike) {
+			if (result instanceof ClientRequest) {
 				options.request = () => result;
 				break;
 			}
 		}
 
-		if (options.dnsCache) {
-			(options as any).lookup = options.dnsCache.lookup;
+		if (options.dnsCache && !('lookup' in options)) {
+			options.lookup = options.dnsCache.lookup;
 		}
 
 		// UNIX sockets
@@ -1090,38 +1090,38 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		const fn: RequestFunction<unknown> = options.cacheableRequest ? cacheFn : realFn;
 
-		if (isAgents(options.agent) && !options.http2) {
-			(options as unknown as RequestOptions).agent = options.agent[isHttps ? 'https' : 'http'];
+		if (isAgents(agent) && !options.http2) {
+			(options as unknown as RequestOptions).agent = agent[isHttps ? 'https' : 'http'];
 		}
 
 		options[kRequest] = realFn as HttpRequestFunction;
 		delete options.request;
 
-		const {timeout} = options;
 		if (timeout) {
 			delete options.timeout;
 		}
 
-		let request;
+		let requestOrResponse;
 
 		try {
-			request = await fn(url, options as unknown as RequestOptions);
+			requestOrResponse = await fn(url, options as unknown as RequestOptions);
 
-			options.request = options[kRequest];
+			options.request = request;
 			options.timeout = timeout;
+			options.agent = agent;
 
-			if (request instanceof ClientRequest) {
-				timer(request);
+			if (requestOrResponse instanceof ClientRequest) {
+				timer(requestOrResponse);
 
 				if (timeout) {
-					timedOut(request, timeout, url);
+					timedOut(requestOrResponse, timeout, url);
 				}
 
-				request.once('response', response => {
+				requestOrResponse.once('response', response => {
 					this._onResponse(response);
 				});
 
-				request.on('error', (error: Error) => {
+				requestOrResponse.on('error', (error: Error) => {
 					if (error instanceof TimedOutTimeoutError) {
 						error = new TimeoutError(error, this.timings!, options);
 					} else {
@@ -1131,7 +1131,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 					this._beforeError(error as RequestError);
 				});
 
-				this[kUnproxyEvents] = proxyEvents(request, this, [
+				this[kUnproxyEvents] = proxyEvents(requestOrResponse, this, [
 					'socket',
 					'abort',
 					'connect',
@@ -1141,14 +1141,14 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 					'timeout'
 				]);
 
-				this[kRequest] = request;
-			} else if (is.undefined(request)) {
+				this[kRequest] = requestOrResponse;
+			} else if (is.undefined(requestOrResponse)) {
 				// Fallback to http(s).request
 				throw new Error('Fallback to `http.request` not implemented yet');
 			} else {
 				// TODO: Rewrite `cacheable-request`
 				// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-				this._onResponse(request as unknown as IncomingMessage);
+				this._onResponse(requestOrResponse as unknown as IncomingMessage);
 			}
 		} catch (error) {
 			throw new RequestError(error.message, error, options, this);
