@@ -36,7 +36,8 @@ const errors = {
 	HTTPError,
 	MaxRedirectsError,
 	TimeoutError,
-	ParseError
+	ParseError,
+	CancelError
 };
 
 const {normalizeArguments} = PromisableRequest;

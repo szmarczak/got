@@ -1,6 +1,6 @@
 import {EventEmitter} from 'events';
 import getStream = require('get-stream');
-import PCancelable =require('p-cancelable');
+import PCancelable = require('p-cancelable');
 import calculateRetryDelay from './calculate-retry-delay';
 import {
 	NormalizedOptions,
@@ -43,7 +43,7 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 	const promise = new PCancelable<T>((resolve, reject, onCancel) => {
 		const makeRequest = (): void => {
 			const request = new PromisableRequest(options.url, options);
-			onCancel(request.destroy);
+			onCancel(() => request.destroy());
 
 			request.once('response', async (response: Response) => {
 				response.retryCount = retryCount;
@@ -165,6 +165,7 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 
 			proxyEvents(request, emitter, [
 				'request',
+				'response',
 				'redirect',
 				'uploadProgress',
 				'downloadProgress'
