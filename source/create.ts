@@ -154,13 +154,22 @@ export const defaultHandler: HandlerFunction = (options, next) => next(options);
 /* MERGE OPTIONS */
 
 export const mergeOptions = (...sources: Options[]): NormalizedOptions => {
-	let mergedOptions = normalizeArguments(undefined, {});
+	let mergedOptions: NormalizedOptions | undefined;
 
 	for (const source of sources) {
 		mergedOptions = normalizeArguments(undefined, source, mergedOptions);
 	}
 
-	return mergedOptions;
+	Object.defineProperty(mergedOptions, 'followRedirects', {
+		get: () => mergedOptions!.followRedirect,
+		set: value => {
+			mergedOptions!.followRedirect = value;
+		},
+		configurable: false,
+		enumerable: false
+	});
+
+	return mergedOptions!;
 };
 
 /* END OF MERGE OPTIONS */

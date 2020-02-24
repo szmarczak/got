@@ -96,15 +96,6 @@ test('extend keeps the old value if the new one is undefined', t => {
 	);
 });
 
-test('extend merges URL instances', t => {
-	// @ts-ignore Custom instance.
-	const a = got.extend({custom: new URL('https://example.com')});
-	// @ts-ignore Custom instance.
-	const b = a.extend({custom: '/foo'});
-	// @ts-ignore Custom instance.
-	t.is(b.defaults.options.custom.toString(), 'https://example.com/foo');
-});
-
 test('hooks are merged on got.extend()', t => {
 	const hooksA = [() => {}];
 	const hooksB = [() => {}];
@@ -144,7 +135,22 @@ test('can set defaults to `got.mergeOptions(...)`', t => {
 		});
 	});
 
-	t.true(instance.defaults.options.followRedirects);
+	t.true(instance.defaults.options.followRedirect);
+});
+
+test('can set defaults to `got.mergeOptions(...)` - `followRedirects` link', t => {
+	const instance = got.extend({
+		mutableDefaults: true,
+		followRedirect: false
+	});
+
+	t.notThrows(() => {
+		instance.defaults.options = got.mergeOptions(instance.defaults.options, {
+			followRedirects: true
+		});
+	});
+
+	t.true(instance.defaults.options.followRedirect);
 });
 
 test('can set mutable defaults using got.extend', t => {
@@ -154,10 +160,23 @@ test('can set mutable defaults using got.extend', t => {
 	});
 
 	t.notThrows(() => {
+		instance.defaults.options.followRedirect = true;
+	});
+
+	t.true(instance.defaults.options.followRedirect);
+});
+
+test('`followRedirects` is a link to `followRedirect`', t => {
+	const instance = got.extend({
+		mutableDefaults: true,
+		followRedirect: false
+	});
+
+	t.notThrows(() => {
 		instance.defaults.options.followRedirects = true;
 	});
 
-	t.true(instance.defaults.options.followRedirects);
+	t.true(instance.defaults.options.followRedirect);
 });
 
 test('only plain objects are freezed', withServer, async (t, server, got) => {
@@ -166,10 +185,13 @@ test('only plain objects are freezed', withServer, async (t, server, got) => {
 	const instance = got.extend({
 		agent: {
 			http: new HttpAgent({keepAlive: true})
-		}
+		},
+		mutableDefaults: true
 	});
 
-	await t.notThrowsAsync(() => instance(''));
+	t.notThrows(() => {
+		(instance.defaults.options.agent as any).http.keepAlive = true;
+	});
 });
 
 test('defaults are cloned on instance creation', t => {

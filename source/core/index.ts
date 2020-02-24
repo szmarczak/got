@@ -1,7 +1,7 @@
 import {promisify} from 'util';
 import {Duplex, Writable, Readable} from 'stream';
 import {ReadStream} from 'fs';
-import {URL} from 'url';
+import {URL, URLSearchParams} from 'url';
 import {Socket} from 'net';
 import {SecureContextOptions} from 'tls';
 import http = require('http');
@@ -151,7 +151,7 @@ export interface NormalizedOptions extends Options {
 	headers: Headers;
 	context: object;
 	hooks: Required<Hooks>;
-	followRedirects: boolean;
+	followRedirect: boolean;
 	maxRedirects: number;
 	throwHttpErrors: boolean;
 	dnsCache?: CacheableLookup;
@@ -175,12 +175,22 @@ export interface Defaults {
 	dnsCache?: CacheableLookup;
 	headers: Headers;
 	hooks: Required<Hooks>;
-	followRedirects: boolean;
+	followRedirect: boolean;
+	followRedirects?: boolean; // It will be never undefined, it's just a link to `followRedirect`
 	maxRedirects: number;
 	cache?: string | CacheableRequest.StorageAdapter;
 	throwHttpErrors: boolean;
 	http2: boolean;
 	allowGetBody: boolean;
+	rejectUnauthorized: boolean;
+
+	// Optional
+	agent?: Agents | false;
+	request?: RequestFunction;
+	searchParams?: URLSearchParams;
+	lookup?: CacheableLookup['lookup'];
+	localAddress?: string;
+	createConnection?: Options['createConnection'];
 }
 
 export interface Progress {
@@ -521,6 +531,16 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			options = {...defaults as NormalizedOptions, ...options, url};
 		}
 
+		if (rawOptions && defaults) {
+			for (const key in rawOptions) {
+				// @ts-ignore Dear TypeScript, all object keys are strings (or symbols which are NOT enumerable).
+				if (is.undefined(rawOptions[key]) && !is.undefined(defaults[key])) {
+					// @ts-ignore See the note above
+					options[key] = defaults[key];
+				}
+			}
+		}
+
 		// Disallow `options.path` and `options.pathname`
 		if (
 			'path' in options ||
@@ -755,19 +775,17 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		assert.any([is.boolean, is.undefined], options.allowGetBody);
 		assert.any([is.boolean, is.undefined], options.rejectUnauthorized);
 
-		if ('followRedirects' in options && 'followRedirect' in options) {
+		if (rawOptions && !('followRedirect' in rawOptions) && 'followRedirects' in rawOptions) {
+			options.followRedirect = rawOptions.followRedirects;
+
+			delete options.followRedirects;
+		} else if ('followRedirects' in options && 'followRedirect' in options) {
 			throw new TypeError('Parameters `followRedirects` and `followRedirect` are mutually exclusive');
-		}
-
-		if (rawOptions && !('followRedirects' in options) && 'followRedirect' in rawOptions) {
-			options.followRedirects = rawOptions.followRedirect;
-
-			delete options.followRedirect;
 		}
 
 		options.decompress = Boolean(options.decompress);
 		options.ignoreInvalidCookies = Boolean(options.ignoreInvalidCookies);
-		options.followRedirects = Boolean(options.followRedirects);
+		options.followRedirect = Boolean(options.followRedirect);
 		options.maxRedirects = options.maxRedirects ?? 0;
 		options.throwHttpErrors = Boolean(options.throwHttpErrors);
 		options.http2 = Boolean(options.http2);

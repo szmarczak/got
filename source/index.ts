@@ -52,7 +52,7 @@ const defaults: InstanceDefaults = {
 		},
 		decompress: true,
 		throwHttpErrors: true,
-		followRedirects: true,
+		followRedirect: true,
 		isStream: false,
 		responseType: 'text',
 		resolveBodyOnly: false,
@@ -62,11 +62,22 @@ const defaults: InstanceDefaults = {
 		ignoreInvalidCookies: false,
 		context: {},
 		http2: false,
-		allowGetBody: false
+		allowGetBody: false,
+		rejectUnauthorized: true
 	},
 	handlers: [defaultHandler],
 	mutableDefaults: false
 };
+
+// TODO: This shouldn't be present in this file
+Object.defineProperty(defaults.options, 'followRedirects', {
+	get: () => defaults.options.followRedirect,
+	set: value => {
+		defaults.options.followRedirect = value;
+	},
+	configurable: false,
+	enumerable: false
+});
 
 const got = create(defaults);
 
