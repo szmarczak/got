@@ -484,15 +484,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 				await this.finalizeBody();
 
-				// Set cookies
-				if (options.cookieJar) {
-					const cookieString: string = await options.cookieJar.getCookieString(options.url.toString());
-
-					if (cookieString !== '') {
-						options.headers.cookie = cookieString;
-					}
-				}
-
 				if (options.encoding) {
 					this.setEncoding(options.encoding);
 				}
@@ -917,6 +908,22 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		this[kIsFromCache] = typedResponse.isFromCache;
 
+		const rawCookies = response.headers['set-cookie'];
+		if (is.object(options.cookieJar) && rawCookies) {
+			let promises: Array<Promise<unknown>> = rawCookies.map(async (rawCookie: string) => (options.cookieJar as PromiseCookieJar).setCookie(rawCookie, url.toString()));
+
+			if (options.ignoreInvalidCookies) {
+				promises = promises.map(async p => p.catch(() => {}));
+			}
+
+			try {
+				await Promise.all(promises);
+			} catch (error) {
+				this._beforeError(error);
+				return;
+			}
+		}
+
 		if (options.followRedirects && response.headers.location && redirectCodes.has(statusCode)) {
 			response.resume(); // We're being redirected, we don't care about the response.
 
@@ -971,22 +978,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		if (options.throwHttpErrors && statusCode !== 304 && (statusCode < 200 || statusCode > 299)) {
 			this._beforeError(new HTTPError(typedResponse, options));
 			return;
-		}
-
-		const rawCookies = response.headers['set-cookie'];
-		if (is.object(options.cookieJar) && rawCookies) {
-			let promises: Array<Promise<unknown>> = rawCookies.map(async (rawCookie: string) => (options.cookieJar as PromiseCookieJar).setCookie(rawCookie, url.toString()));
-
-			if (options.ignoreInvalidCookies) {
-				promises = promises.map(async p => p.catch(() => {}));
-			}
-
-			try {
-				await Promise.all(promises);
-			} catch (error) {
-				this._beforeError(error);
-				return;
-			}
 		}
 
 		if (options.decompress) {
@@ -1045,6 +1036,15 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			if (is.undefined(headers[key])) {
 				// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
 				delete headers[key];
+			}
+		}
+
+		// Set cookies
+		if (options.cookieJar) {
+			const cookieString: string = await options.cookieJar.getCookieString(options.url.toString());
+
+			if (is.nonEmptyString(cookieString)) {
+				options.headers.cookie = cookieString;
 			}
 		}
 
