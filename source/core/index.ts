@@ -914,22 +914,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		this[kBodySize] = Number(headers['content-length']) || undefined;
 	}
 
-	_deleteBody() {
-		const {options} = this;
-
-		if ('body' in options) {
-			delete options.body;
-		}
-
-		if ('json' in options) {
-			delete options.json;
-		}
-
-		if ('form' in options) {
-			delete options.form;
-		}
-	}
-
 	async _onResponse(response: IncomingMessage): Promise<void> {
 		const {options} = this;
 		const {url} = options;
@@ -969,12 +953,23 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			delete this[kRequest];
 			this[kUnproxyEvents]();
 
-			if (statusCode === 303 && options.method !== 'GET' && options.method !== 'HEAD') {
+			const shouldBeGet = statusCode === 303 && options.method !== 'GET' && options.method !== 'HEAD';
+			if (shouldBeGet || !options.methodRewriting) {
 				// Server responded with "see other", indicating that the resource exists at another location,
 				// and the client should request it from that location via GET or HEAD.
 				options.method = 'GET';
 
-				this._deleteBody();
+				if ('body' in options) {
+					delete options.body;
+				}
+
+				if ('json' in options) {
+					delete options.json;
+				}
+
+				if ('form' in options) {
+					delete options.form;
+				}
 			}
 
 			if (this.redirects.length >= options.maxRedirects) {
@@ -1207,35 +1202,22 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				this[kRequest] = requestOrResponse;
 
 				// Send body
-				const hasRedirects = this.redirects.length !== 0;
-				if (!options.methodRewriting && hasRedirects) {
-					requestOrResponse.method = 'GET';
-					options.method = 'GET';
+				const currentRequest = this.redirects.length === 0 ? this : requestOrResponse;
+				if (is.nodeStream(options.body)) {
+					options.body.pipe(currentRequest);
+					options.body.once('error', (error: NodeJS.ErrnoException) => {
+						this._beforeError(new UploadError(error, options, this));
+					});
 
-					this._deleteBody();
-
-					requestOrResponse.end();
+					options.body.once('end', () => {
+						delete options.body;
+					});
 				} else {
-					if (is.nodeStream(options.body)) {
-						options.body.pipe(this);
-						options.body.once('error', (error: NodeJS.ErrnoException) => {
-							this._beforeError(new UploadError(error, options, this));
-						});
-
-						options.body.once('end', () => {
-							delete options.body;
-						});
-					} else {
-						if (options.body) {
-							this._writeRequest(options.body, null as unknown as string, () => {});
-						}
-
-						if (hasRedirects) {
-							requestOrResponse.end();
-						} else {
-							this.end();
-						}
+					if (options.body) {
+						this._writeRequest(options.body, null as unknown as string, () => {});
 					}
+
+					currentRequest.end();
 				}
 
 				this.emit('request', requestOrResponse);

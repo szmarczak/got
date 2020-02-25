@@ -375,7 +375,7 @@ test('body is passed on POST redirect', withServer, async (t, server, got) => {
 	t.is(body, 'foobar');
 });
 
-test.only('method rewriting can be turned off', withServer, async (t, server, got) => {
+test('method rewriting can be turned off', withServer, async (t, server, got) => {
 	server.post('/redirect', (_request, response) => {
 		response.writeHead(302, {
 			location: '/'
