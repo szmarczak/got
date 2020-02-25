@@ -11,29 +11,8 @@ import {
 	ReadError,
 	ParseError
 } from './types';
-import PromisableRequest from './core';
+import PromisableRequest, {parseBody} from './core';
 import proxyEvents from '../utils/proxy-events';
-
-export const knownBodyTypes = ['json', 'buffer', 'text'];
-
-// @ts-ignore The error is: Not all code paths return a value.
-const parseBody = (body: Buffer, responseType: NormalizedOptions['responseType'], encoding: NormalizedOptions['encoding']): unknown => {
-	if (responseType === 'text') {
-		return body.toString(encoding);
-	}
-
-	if (responseType === 'json') {
-		return body.length === 0 ? '' : JSON.parse(body.toString());
-	}
-
-	if (responseType === 'buffer') {
-		return Buffer.from(body);
-	}
-
-	if (!knownBodyTypes.includes(responseType)) {
-		throw new TypeError(`Unknown body type '${responseType as string}'`);
-	}
-};
 
 export default function asPromise<T>(options: NormalizedOptions): CancelableRequest<T> {
 	let retryCount = 0;

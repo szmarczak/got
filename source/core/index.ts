@@ -1240,10 +1240,14 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 	async _beforeError(error: RequestError): Promise<void> {
 		try {
-			if (error.response) {
-				error.response.body = await getStream(error.response);
+			const {response} = error;
+			if (response && is.undefined(response.body)) {
+				const body = await getStream.buffer(response);
+				response.body = body;
 			}
+		} catch (_) {}
 
+		try {
 			for (const hook of this.options.hooks.beforeError) {
 				// eslint-disable-next-line no-await-in-loop
 				error = await hook(error);
