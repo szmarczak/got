@@ -1335,7 +1335,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 					this[kBodySize] = this[kUploadedSize];
 
 					this.emit('uploadProgress', this.uploadProgress);
-					this.emit('upload-complete');
+					this[kRequest].emit('upload-complete');
 				}
 
 				callback(error);

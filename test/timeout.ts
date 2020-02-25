@@ -159,8 +159,7 @@ test.serial('send timeout (keepalive)', withServerAndLolex, async (t, server, go
 	);
 });
 
-// TODO: fix this
-test.serial.failing('response timeout', withServerAndLolex, async (t, server, got, clock) => {
+test.serial('response timeout', withServerAndLolex, async (t, server, got, clock) => {
 	server.get('/', defaultHandler(clock));
 
 	await t.throwsAsync(
@@ -195,8 +194,7 @@ test.serial('response timeout unaffected by slow download', withServerAndLolex, 
 	clock.tick(100);
 });
 
-// TODO: fix this
-test.serial.failing('response timeout (keepalive)', withServerAndLolex, async (t, server, got, clock) => {
+test.serial('response timeout (keepalive)', withServerAndLolex, async (t, server, got, clock) => {
 	server.get('/', defaultHandler(clock));
 	server.get('/prime', (_request, response) => {
 		response.end('ok');
@@ -366,6 +364,8 @@ test.serial('lookup timeout no error (keepalive)', withServerAndLolex, async (t,
 			t.fail('connect event fired, invalidating test');
 		});
 	}));
+
+	keepAliveAgent.destroy();
 });
 
 test.serial('retries on timeout', withServer, async (t, server, got) => {
@@ -538,6 +538,8 @@ test.serial('no memory leak when using socket timeout and keepalive agent', with
 	await promise;
 
 	t.is(socket.listenerCount('timeout'), 0);
+
+	keepAliveAgent.destroy();
 });
 
 test('ensure there are no new timeouts after cancelation', t => {
