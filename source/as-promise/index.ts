@@ -25,6 +25,12 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 				options.headers.accept = 'application/json';
 			}
 
+			// Support retries
+			const {throwHttpErrors} = options;
+			if (!throwHttpErrors) {
+				options.throwHttpErrors = true;
+			}
+
 			const request = new PromisableRequest(options.url, options);
 			onCancel(() => request.destroy());
 
@@ -97,47 +103,60 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 			});
 
 			request.once('error', (error: RequestError) => {
-				if (error instanceof HTTPError) {
-					let backoff: number;
+				let backoff: number;
 
-					retryCount++;
+				retryCount++;
 
-					try {
-						backoff = options.retry.calculateDelay({
+				try {
+					backoff = options.retry.calculateDelay({
+						attemptCount: retryCount,
+						retryOptions: options.retry,
+						error,
+						computedValue: calculateRetryDelay({
 							attemptCount: retryCount,
 							retryOptions: options.retry,
 							error,
-							computedValue: calculateRetryDelay({
-								attemptCount: retryCount,
-								retryOptions: options.retry,
-								error,
-								computedValue: 0
-							})
-						});
-					} catch (error_) {
-						request._beforeError(error_);
-						return;
-					}
-
-					if (backoff) {
-						const retry = async (): Promise<void> => {
-							try {
-								for (const hook of options.hooks.beforeRetry) {
-									// eslint-disable-next-line no-await-in-loop
-									await hook(options, error, retryCount);
-								}
-							} catch (error_) {
-								request._beforeError(error_);
-								return;
-							}
-
-							makeRequest();
-						};
-
-						setTimeout(retry, backoff);
-						return;
-					}
+							computedValue: 0
+						})
+					});
+				} catch (error_) {
+					request.destroy();
+					reject(error_);
+					return;
 				}
+
+				if (backoff) {
+					// Don't emit the `response` event
+					request.destroy();
+
+					const retry = async (): Promise<void> => {
+						try {
+							for (const hook of options.hooks.beforeRetry) {
+								// eslint-disable-next-line no-await-in-loop
+								await hook(options, error, retryCount);
+							}
+						} catch (error_) {
+							request._beforeError(error_);
+							return;
+						}
+
+						options.throwHttpErrors = throwHttpErrors;
+						makeRequest();
+					};
+
+					setTimeout(retry, backoff);
+					return;
+				} else {
+					// No retry has been made
+					retryCount--;
+				}
+
+				if (!throwHttpErrors && error instanceof HTTPError) {
+					return;
+				}
+
+				// Don't emit the `response` event
+				request.destroy();
 
 				reject(error);
 			});

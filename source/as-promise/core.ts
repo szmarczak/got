@@ -7,7 +7,7 @@ import {
 	Defaults,
 	ResponseType
 } from './types';
-import Request, {knownHookEvents, RequestError} from '../core';
+import Request, {knownHookEvents, RequestError, HTTPError} from '../core';
 
 if (!knownHookEvents.includes('beforeRetry' as any)) {
 	knownHookEvents.push('beforeRetry' as any, 'afterResponse' as any);
@@ -37,6 +37,7 @@ export const parseBody = (body: Buffer, responseType: ResponseType, encoding: No
 export default class PromisableRequest extends Request {
 	['constructor']: typeof PromisableRequest;
 	declare options: NormalizedOptions;
+	declare _throwHttpErrors: boolean;
 
 	static normalizeArguments(url?: string | URL, nonNormalizedOptions?: Options, defaults?: Defaults): NormalizedOptions {
 		const options = super.normalizeArguments(url, nonNormalizedOptions, defaults) as NormalizedOptions;
@@ -135,6 +136,10 @@ export default class PromisableRequest extends Request {
 			error = error_;
 		}
 
-		this.destroy(error);
+		if (this._throwHttpErrors || !(error instanceof HTTPError)) {
+			this.destroy(error);
+		} else {
+			this.emit('error', error);
+		}
 	}
 }

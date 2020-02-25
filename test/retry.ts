@@ -22,7 +22,7 @@ const createSocketTimeoutStream = (): http.ClientRequest => {
 	const stream = new PassThroughStream();
 	// @ts-ignore Mocking the behaviour of a ClientRequest
 	stream.setTimeout = (ms, callback) => {
-		callback();
+		process.nextTick(callback);
 	};
 
 	// @ts-ignore Mocking the behaviour of a ClientRequest
@@ -132,6 +132,7 @@ test('custom error codes', async t => {
 	const error = await t.throwsAsync<Error & {code: typeof errorCode}>(got('https://example.com', {
 		request: () => {
 			const emitter = new EventEmitter() as http.ClientRequest;
+			emitter.abort = () => {};
 			emitter.end = () => {};
 
 			const error = new Error('Snap!');

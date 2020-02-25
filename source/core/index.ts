@@ -917,6 +917,11 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	async _onResponse(response: IncomingMessage): Promise<void> {
 		const {options} = this;
 		const {url} = options;
+
+		if (options.decompress) {
+			response = decompressResponse(response);
+		}
+
 		const statusCode = response.statusCode!;
 		const typedResponse = response as Response;
 
@@ -1016,11 +1021,10 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		const isOk = (statusCode >= 200 && statusCode <= limitStatusCode) || statusCode === 304;
 		if (options.throwHttpErrors && !isOk) {
 			this._beforeError(new HTTPError(typedResponse, options));
-			return;
-		}
 
-		if (options.decompress) {
-			response = decompressResponse(response);
+			if (this.destroyed) {
+				return;
+			}
 		}
 
 		// We need to call `_read()` only when the Request stream is flowing
@@ -1179,7 +1183,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 					this._onResponse(response);
 				});
 
-				requestOrResponse.on('error', (error: Error) => {
+				requestOrResponse.once('error', (error: Error) => {
 					if (error instanceof TimedOutTimeoutError) {
 						error = new TimeoutError(error, this.timings!, options);
 					} else {
