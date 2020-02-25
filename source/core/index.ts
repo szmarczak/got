@@ -954,6 +954,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		if (options.followRedirect && response.headers.location && redirectCodes.has(statusCode)) {
 			response.resume(); // We're being redirected, we don't care about the response.
+			// TODO: Unattach timed-out
 
 			// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
 			delete this[kRequest];
@@ -1040,6 +1041,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		this.on('pause', () => {
 			response.pause();
 		});
+
+		this.emit('downloadProgress', this.downloadProgress);
 
 		response.once('end', () => {
 			this[kResponseSize] = this[kDownloadedSize];
