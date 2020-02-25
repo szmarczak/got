@@ -448,12 +448,12 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	declare [kResponse]: IncomingMessage;
 	declare [kResponseSize]?: number;
 	declare [kUnproxyEvents]: () => void;
+	declare [kIsWriteLocked]: boolean;
 	[kDownloadedSize]: number;
 	[kUploadedSize]: number;
 	[kBodySize]?: number;
 	[kServerResponsesPiped]: Set<ServerResponse>;
 	[kIsFromCache]?: boolean;
-	[kIsWriteLocked]: boolean;
 
 	declare options: NormalizedOptions;
 	declare requestUrl: string;
@@ -461,14 +461,16 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	redirects: string[];
 
 	constructor(url: string | URL, options?: Options, defaults?: Defaults) {
-		super();
+		super({
+			// It needs to be zero because we're just proxying the data to another stream
+			highWaterMark: 0
+		});
 
 		this[kDownloadedSize] = 0;
 		this[kUploadedSize] = 0;
 		this.finalized = false;
 		this[kServerResponsesPiped] = new Set<ServerResponse>();
 		this.redirects = [];
-		this[kIsWriteLocked] = false;
 
 		if (!options) {
 			options = {};
@@ -845,6 +847,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				throw new TypeError('The `form` option must be an Object');
 			}
 
+			this[kIsWriteLocked] = false;
+
 			const lockWrite = (): void => {
 				this[kIsWriteLocked] = true;
 			};
@@ -852,8 +856,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			const unlockWrite = (): void => {
 				this[kIsWriteLocked] = false;
 			};
-
-			lockWrite();
 
 			this.on('pipe', (source: Writable) => {
 				source.prependListener('data', unlockWrite);
@@ -1007,10 +1009,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			} catch (error) {
 				this._beforeError(error);
 				return;
-			}
-
-			if (kRequest in this && (options.method === 'GET' || options.method === 'HEAD')) {
-				this[kRequest].end();
 			}
 
 			return;
@@ -1320,6 +1318,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	}
 
 	_final(callback: (error?: Error | null) => void): void {
+		this[kIsWriteLocked] = true;
+
 		const endRequest = (): void => {
 			// We need to check if `this[kRequest]` is present,
 			// because it isn't when we use cache.

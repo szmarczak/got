@@ -88,6 +88,8 @@ export default got;
 // - fix test/pagination.ts
 // - fix test/post.ts
 // - fix test/progress.ts
+// - fix test/timeout.ts
+// - fix test/unix-socket.ts
 
 // For CommonJS default export support
 module.exports = got;
