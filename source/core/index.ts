@@ -659,7 +659,13 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			});
 
 			// Protocol check
-			const {protocol} = options.url;
+			let {protocol} = options.url;
+
+			if (protocol === 'unix:') {
+				protocol = 'http:';
+
+				options.url = new URL(`http://unix${options.url.pathname}${options.url.search}`);
+			}
 
 			if (protocol !== 'http:' && protocol !== 'https:') {
 				throw new UnsupportedProtocolError(options as NormalizedOptions);
