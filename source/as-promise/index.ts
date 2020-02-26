@@ -32,10 +32,16 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 			}
 
 			const request = new PromisableRequest(options.url, options);
+			request._throwHttpErrors = throwHttpErrors;
 			onCancel(() => request.destroy());
 
 			request.once('response', async (response: Response) => {
 				response.retryCount = retryCount;
+
+				if (response.request.aborted) {
+					// Canceled while downloading - will throw a `CancelError` or `TimeoutError` error
+					return;
+				}
 
 				// Download body
 				try {
@@ -45,16 +51,11 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 					return;
 				}
 
-				if (response.request.aborted) {
-					// Canceled while downloading - will throw a `CancelError` or `TimeoutError` error
-					return;
-				}
-
 				// Parse body
 				try {
-					response.body = parseBody(body, options.responseType, options.encoding);
+					response!.body = parseBody(body, options.responseType, options.encoding);
 				} catch (error) {
-					response.body = body.toString();
+					response!.body = body.toString();
 
 					const parseError = new ParseError(error, response, options);
 					request._beforeError(parseError);

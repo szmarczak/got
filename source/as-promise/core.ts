@@ -116,16 +116,20 @@ export default class PromisableRequest extends Request {
 	}
 
 	async _beforeError(error: RequestError): Promise<void> {
-		try {
-			const {response} = error;
-			const {encoding} = this.options;
+		const isHTTPError = error instanceof HTTPError;
 
-			if (response && is.undefined(response.body)) {
-				const body = await getStream.buffer(response);
-				response.body = body.toString(encoding);
-				response.body = parseBody(body, this.options.responseType, encoding);
-			}
-		} catch (_) {}
+		if (this._throwHttpErrors) {
+			try {
+				const {response} = error;
+				const {encoding} = this.options;
+
+				if (response && is.undefined(response.body)) {
+					const body = await getStream.buffer(response);
+					response.body = body.toString(encoding);
+					response.body = parseBody(body, this.options.responseType, encoding);
+				}
+			} catch (_) {}
+		}
 
 		try {
 			for (const hook of this.options.hooks.beforeError) {
@@ -136,7 +140,7 @@ export default class PromisableRequest extends Request {
 			error = error_;
 		}
 
-		if (this._throwHttpErrors || !(error instanceof HTTPError)) {
+		if (this._throwHttpErrors || !isHTTPError) {
 			this.destroy(error);
 		} else {
 			this.emit('error', error);
