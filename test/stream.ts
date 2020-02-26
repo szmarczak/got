@@ -105,7 +105,7 @@ test('throws on write if no payload method is present', withServer, (t, server, 
 	t.throws(() => {
 		stream.end('wow');
 	}, {
-		message: 'The `GET` method cannot be used with a body'
+		message: 'The payload has been already provided'
 	});
 
 	stream.destroy();

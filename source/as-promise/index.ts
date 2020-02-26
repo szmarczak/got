@@ -166,10 +166,6 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 				reject(error);
 			});
 
-			if (!('body' in options)) {
-				request.end();
-			}
-
 			proxyEvents(request, emitter, [
 				'request',
 				'response',

@@ -35,7 +35,6 @@ const kUploadedSize = Symbol('uploadedSize');
 const kServerResponsesPiped = Symbol('serverResponsesPiped');
 const kUnproxyEvents = Symbol('unproxyEvents');
 const kIsFromCache = Symbol('isFromCache');
-const kIsWriteLocked = Symbol('isWriteLocked');
 export const kIsNormalizedAlready = Symbol('isNormalizedAlready');
 
 const supportsBrotli = is.string((process.versions as any).brotli);
@@ -448,7 +447,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	declare [kResponse]: IncomingMessage;
 	declare [kResponseSize]?: number;
 	declare [kUnproxyEvents]: () => void;
-	declare [kIsWriteLocked]: boolean;
 	[kDownloadedSize]: number;
 	[kUploadedSize]: number;
 	[kBodySize]?: number;
@@ -476,6 +474,25 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			options = {};
 		}
 
+		const unlockWrite = () => this._unlockWrite();
+		const lockWrite = () => this._lockWrite();
+
+		this.on('pipe', (source: Writable) => {
+			source.prependListener('data', unlockWrite);
+			source.on('data', lockWrite);
+
+			source.prependListener('end', unlockWrite);
+			source.on('end', lockWrite);
+		});
+
+		this.on('unpipe', (source: Writable) => {
+			source.off('data', unlockWrite);
+			source.off('data', lockWrite);
+
+			source.off('end', unlockWrite);
+			source.off('end', lockWrite);
+		});
+
 		this.on('pipe', source => {
 			if (source instanceof IncomingMessage) {
 				this.options.headers = {
@@ -487,6 +504,13 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		(async (nonNormalizedOptions: Options) => {
 			try {
+				{
+					const {json, body, form} = nonNormalizedOptions;
+					if (json || body || form) {
+						this._lockWrite();
+					}
+				}
+
 				if (nonNormalizedOptions.body instanceof ReadStream) {
 					await waitForOpenFile(nonNormalizedOptions.body);
 				}
@@ -815,6 +839,20 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		return options as NormalizedOptions;
 	}
 
+	_lockWrite() {
+		const onLockedWrite = () => {
+			throw new TypeError('The payload has been already provided');
+		};
+
+		this.write = onLockedWrite;
+		this.end = onLockedWrite;
+	}
+
+	_unlockWrite() {
+		this.write = super.write;
+		this.end = super.end;
+	}
+
 	async finalizeBody(): Promise<void> {
 		const {options} = this;
 		const {headers} = options;
@@ -847,24 +885,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				throw new TypeError('The `form` option must be an Object');
 			}
 
-			const lockWrite = (): void => {
-				this[kIsWriteLocked] = true;
-			};
-
-			const unlockWrite = (): void => {
-				this[kIsWriteLocked] = false;
-			};
-
-			this.on('pipe', (source: Writable) => {
-				source.prependListener('data', unlockWrite);
-				source.on('data', lockWrite);
-			});
-
-			this.on('unpipe', (source: Writable) => {
-				source.off('data', unlockWrite);
-				source.off('data', lockWrite);
-			});
-
 			{
 				// Serialize body
 				const noContentType = !is.string(headers['content-type']);
@@ -888,10 +908,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 					options.body = JSON.stringify(options.json);
 				}
 
-				if (!isFormData(options.body)) {
-					lockWrite();
-				}
-
 				const uploadBodySize = await getBodySize(options);
 
 				// See https://tools.ietf.org/html/rfc7230#section-3.3.2
@@ -912,6 +928,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 					}
 				}
 			}
+		} else if (cannotHaveBody) {
+			this._lockWrite();
 		}
 
 		this[kBodySize] = Number(headers['content-length']) || undefined;
@@ -1219,11 +1237,15 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 						delete options.body;
 					});
 				} else {
+					this._unlockWrite();
+
 					if (options.body) {
 						this._writeRequest(options.body, null as unknown as string, () => {});
 					}
 
 					currentRequest.end();
+
+					this._lockWrite();
 				}
 
 				this.emit('request', requestOrResponse);
@@ -1284,15 +1306,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	}
 
 	_write(chunk: any, encoding: string, callback: (error?: Error | null) => void): void {
-		if (this[kIsWriteLocked]) {
-			throw new TypeError('The payload has been already provided');
-		}
-
-		const {options} = this;
-		if (withoutBody.has(options.method)) {
-			throw new TypeError(`The \`${options.method}\` method cannot be used with a body`);
-		}
-
 		const write = (): void => {
 			if (kRequest in this) {
 				this._writeRequest(chunk, encoding, callback);
