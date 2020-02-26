@@ -103,6 +103,10 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 			});
 
 			request.once('error', (error: RequestError) => {
+				if (promise.isCanceled) {
+					return;
+				}
+
 				let backoff: number;
 
 				retryCount++;

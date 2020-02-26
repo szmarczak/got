@@ -2,7 +2,6 @@ import {promisify} from 'util';
 import http = require('http');
 import stream = require('stream');
 import test from 'ava';
-import proxyquire = require('proxyquire');
 import got, {RequestError, HTTPError} from '../source';
 import withServer from './helpers/with-server';
 
@@ -141,11 +140,15 @@ test('`http.request` pipe error', async t => {
 		request: () => {
 			const proxy = new stream.PassThrough();
 
-			(proxy as any).socket = {
-				remoteAddress: ''
+			const anyProxy = proxy as any;
+			anyProxy.socket = {
+				remoteAddress: '',
+				prependOnceListener: () => {}
 			};
 
-			(proxy as any).headers = {};
+			anyProxy.headers = {};
+
+			anyProxy.abort = () => {};
 
 			proxy.resume();
 			proxy.read = () => {
@@ -173,25 +176,6 @@ test('`http.request` error through CacheableRequest', async t => {
 		instanceOf: got.RequestError,
 		message: 'The header content contains invalid characters'
 	});
-});
-
-// TODO: It can happen only when using cache
-test.failing('catches error in mimicResponse', withServer, async (t, server) => {
-	server.get('/', (_request, response) => {
-		response.end('ok');
-	});
-
-	const mimicResponse = (): never => {
-		throw new Error('Error in mimic-response');
-	};
-
-	mimicResponse['@global'] = true;
-
-	const proxiedGot = proxyquire('../source', {
-		'mimic-response': mimicResponse
-	});
-
-	await t.throwsAsync(proxiedGot(server.url), {message: 'Error in mimic-response'});
 });
 
 test('errors are thrown directly when options.stream is true', t => {

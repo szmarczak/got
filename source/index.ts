@@ -93,57 +93,6 @@ export default got;
 /*
 clear && npm run build && ava test/agent.ts test/arguments.ts test/cache.ts test/cancel.ts test/cookies.ts test/create.ts test/error.ts test/gzip.ts test/headers.ts test/helpers.ts test/http.ts test/https.ts test/merge-instances.ts test/normalize-arguments.ts test/promise.ts test/redirects.ts test/response-parse.ts test/retry.ts test/socket-destroyed.ts test/stream.ts test/timeout.ts test/url-to-options.ts
 
-> got@10.6.0 build /home/szm/Desktop/got
-> del-cli dist && tsc
-
-
-  7 tests failed
-  2 tests skipped
-  3 uncaught exceptions
-
-  error.ts › `http.request` pipe error
-
-  dist/test/error.js:119
-
-   118:     // @ts-ignore Error tests
-   119:     await t.throwsAsync(source_1.default('https://example.com', {
-   120:         // @ts-ignore Error tests
-
-  Promise rejected with unexpected exception:
-
-  RequestError {
-    code: undefined,
-    timings: undefined,
-    message: 'socket.prependOnceListener is not a function',
-  }
-
-  Expected message to equal:
-
-  'snap!'
-
-  PromisableRequest.makeRequest (dist/source/core/index.js:874:19)
-  onSocket (node_modules/@szmarczak/http-timer/dist/source/index.js:58:16)
-  Function.timer [as default] (node_modules/@szmarczak/http-timer/dist/source/index.js:78:9)
-  PromisableRequest.makeRequest (dist/source/core/index.js:815:37)
-  dist/source/core/index.js:265:17
-
-
-
-  cancel.ts › does not retry after cancelation
-
-  dist/test/cancel.js:48
-
-   47:             calculateDelay: () => {
-   48:                 t.fail('Makes a new try after cancelation');
-   49:                 return 0;
-
-  Makes a new try after cancelation
-
-  Object.calculateDelay (dist/test/cancel.js:48:19)
-  PromisableRequest.<anonymous> (dist/source/as-promise/index.js:93:45)
-
-
-
   http.ts › doesn't throw if `options.throwHttpErrors` is false
 
   dist/test/http.js:53
