@@ -1,3 +1,5 @@
+import {URL} from 'url';
+import {Response, Options} from './as-promise';
 import create, {defaultHandler, InstanceDefaults} from './create';
 
 const defaults: InstanceDefaults = {
@@ -63,21 +65,47 @@ const defaults: InstanceDefaults = {
 		context: {},
 		http2: false,
 		allowGetBody: false,
-		rejectUnauthorized: true
+		rejectUnauthorized: true,
+		_pagination: {
+			transform: (response: Response) => {
+				return JSON.parse(response.body as string);
+			},
+			paginate: response => {
+				if (!Reflect.has(response.headers, 'link')) {
+					return false;
+				}
+
+				const items = (response.headers.link as string).split(',');
+
+				let next: string | undefined;
+				for (const item of items) {
+					const parsed = item.split(';');
+
+					if (parsed[1].includes('next')) {
+						next = parsed[0].trimStart().trim();
+						next = next.slice(1, -1);
+						break;
+					}
+				}
+
+				if (next) {
+					const options: Options = {
+						url: new URL(next)
+					};
+
+					return options;
+				}
+
+				return false;
+			},
+			filter: () => true,
+			shouldContinue: () => true,
+			countLimit: Infinity
+		}
 	},
 	handlers: [defaultHandler],
 	mutableDefaults: false
 };
-
-// TODO: This shouldn't be present in this file
-Object.defineProperty(defaults.options, 'followRedirects', {
-	get: () => defaults.options.followRedirect,
-	set: value => {
-		defaults.options.followRedirect = value;
-	},
-	configurable: false,
-	enumerable: false
-});
 
 const got = create(defaults);
 
@@ -85,11 +113,10 @@ export default got;
 
 // TODO:
 // - fix test/hooks.ts
-// - fix test/pagination.ts
 // - fix test/progress.ts
 
 /*
-clear && npm run build && ava test/unix-socket.ts test/post.ts test/agent.ts test/arguments.ts test/cache.ts test/cancel.ts test/cookies.ts test/create.ts test/error.ts test/gzip.ts test/headers.ts test/helpers.ts test/http.ts test/https.ts test/merge-instances.ts test/normalize-arguments.ts test/promise.ts test/redirects.ts test/response-parse.ts test/retry.ts test/socket-destroyed.ts test/stream.ts test/timeout.ts test/url-to-options.ts
+clear && npm run build && ava test/pagination.ts test/unix-socket.ts test/post.ts test/agent.ts test/arguments.ts test/cache.ts test/cancel.ts test/cookies.ts test/create.ts test/error.ts test/gzip.ts test/headers.ts test/helpers.ts test/http.ts test/https.ts test/merge-instances.ts test/normalize-arguments.ts test/promise.ts test/redirects.ts test/response-parse.ts test/retry.ts test/socket-destroyed.ts test/stream.ts test/timeout.ts test/url-to-options.ts
 */
 
 // For CommonJS default export support

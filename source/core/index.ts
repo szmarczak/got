@@ -120,7 +120,6 @@ export interface Options extends SecureContextOptions {
 	dnsCache?: CacheableLookup | boolean;
 	context?: object;
 	hooks?: Hooks;
-	followRedirects?: boolean;
 	followRedirect?: boolean;
 	maxRedirects?: number;
 	cache?: string | CacheableRequest.StorageAdapter;
@@ -179,7 +178,6 @@ export interface Defaults {
 	headers: Headers;
 	hooks: Required<Hooks>;
 	followRedirect: boolean;
-	followRedirects?: boolean; // It will be never undefined, it's just a link to `followRedirect`
 	maxRedirects: number;
 	cache?: string | CacheableRequest.StorageAdapter;
 	throwHttpErrors: boolean;
@@ -574,7 +572,11 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				throw new TypeError('The `url` option is mutually exclusive with the `input` argument');
 			}
 
-			options = {...defaults as NormalizedOptions, ...options, url};
+			options = {...defaults as NormalizedOptions, ...options};
+
+			if (url) {
+				options.url = url;
+			}
 		}
 
 		if (rawOptions && defaults) {
@@ -597,7 +599,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			'search' in options ||
 			'protocol' in options
 		) {
-			throw new TypeError('The legacy `url.Url` is deprecated. Use `URL` instead.');
+			throw new TypeError('The legacy `url.Url` has been deprecated. Use `URL` instead.');
 		}
 
 		// `options.method`
@@ -799,7 +801,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			throw new TypeError(`Parameter \`hooks\` must be an Object, not ${is(options.hooks)}`);
 		}
 
-		if (defaults) {
+		if (defaults?.hooks) {
 			for (const event of knownHookEvents) {
 				if (!(event in options.hooks && is.undefined(options.hooks[event]))) {
 					// See https://github.com/microsoft/TypeScript/issues/31445#issuecomment-576929044
@@ -816,24 +818,20 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			throw new TypeError('To get a Buffer, set `options.responseType` to `buffer` instead');
 		}
 
+		if ('followRedirects' in options) {
+			throw new TypeError('The `followRedirects` option does not exist. Use `followRedirect` instead.');
+		}
+
 		assert.any([is.boolean, is.undefined], options.decompress);
 		assert.any([is.boolean, is.undefined], options.ignoreInvalidCookies);
 		assert.any([is.string, is.undefined], options.encoding);
-		assert.any([is.boolean, is.undefined], options.followRedirects, options.followRedirect);
+		assert.any([is.boolean, is.undefined], options.followRedirect);
 		assert.any([is.string, is.undefined], options.encoding);
 		assert.any([is.number, is.undefined], options.maxRedirects);
 		assert.any([is.boolean, is.undefined], options.throwHttpErrors);
 		assert.any([is.boolean, is.undefined], options.http2);
 		assert.any([is.boolean, is.undefined], options.allowGetBody);
 		assert.any([is.boolean, is.undefined], options.rejectUnauthorized);
-
-		if (rawOptions && !('followRedirect' in rawOptions) && 'followRedirects' in rawOptions) {
-			options.followRedirect = rawOptions.followRedirects;
-
-			delete options.followRedirects;
-		} else if ('followRedirects' in options && 'followRedirect' in options) {
-			throw new TypeError('Parameters `followRedirects` and `followRedirect` are mutually exclusive');
-		}
 
 		options.decompress = Boolean(options.decompress);
 		options.ignoreInvalidCookies = Boolean(options.ignoreInvalidCookies);

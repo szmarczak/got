@@ -138,21 +138,6 @@ test('can set defaults to `got.mergeOptions(...)`', t => {
 	t.true(instance.defaults.options.followRedirect);
 });
 
-test('can set defaults to `got.mergeOptions(...)` - `followRedirects` link', t => {
-	const instance = got.extend({
-		mutableDefaults: true,
-		followRedirect: false
-	});
-
-	t.notThrows(() => {
-		instance.defaults.options = got.mergeOptions(instance.defaults.options, {
-			followRedirects: true
-		});
-	});
-
-	t.true(instance.defaults.options.followRedirect);
-});
-
 test('can set mutable defaults using got.extend', t => {
 	const instance = got.extend({
 		mutableDefaults: true,
@@ -161,19 +146,6 @@ test('can set mutable defaults using got.extend', t => {
 
 	t.notThrows(() => {
 		instance.defaults.options.followRedirect = true;
-	});
-
-	t.true(instance.defaults.options.followRedirect);
-});
-
-test('`followRedirects` is a link to `followRedirect`', t => {
-	const instance = got.extend({
-		mutableDefaults: true,
-		followRedirect: false
-	});
-
-	t.notThrows(() => {
-		instance.defaults.options.followRedirects = true;
 	});
 
 	t.true(instance.defaults.options.followRedirect);

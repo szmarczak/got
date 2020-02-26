@@ -153,8 +153,6 @@ const aliases: readonly HTTPAlias[] = [
 
 export const defaultHandler: HandlerFunction = (options, next) => next(options);
 
-/* MERGE OPTIONS */
-
 export const mergeOptions = (...sources: Options[]): NormalizedOptions => {
 	let mergedOptions: NormalizedOptions | undefined;
 
@@ -162,19 +160,8 @@ export const mergeOptions = (...sources: Options[]): NormalizedOptions => {
 		mergedOptions = normalizeArguments(undefined, source, mergedOptions);
 	}
 
-	Object.defineProperty(mergedOptions, 'followRedirects', {
-		get: () => mergedOptions!.followRedirect,
-		set: value => {
-			mergedOptions!.followRedirect = value;
-		},
-		configurable: false,
-		enumerable: false
-	});
-
 	return mergedOptions!;
 };
-
-/* END OF MERGE OPTIONS */
 
 const create = (defaults: InstanceDefaults): Got => {
 	// Proxy properties from next handlers
@@ -308,7 +295,7 @@ const create = (defaults: InstanceDefaults): Got => {
 			}
 
 			if (optionsToMerge !== undefined) {
-				normalizedOptions = normalizeArguments(undefined, normalizedOptions, optionsToMerge as DefaultOptions);
+				normalizedOptions = normalizeArguments(undefined, optionsToMerge, normalizedOptions);
 			}
 		}
 	}) as GotPaginate;

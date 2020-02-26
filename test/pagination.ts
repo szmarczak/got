@@ -112,11 +112,11 @@ test('custom paginate function', withServer, async (t, server, got) => {
 			paginate: response => {
 				const url = new URL(response.url);
 
-				if (url.pathname === '/?page=3') {
+				if (url.search === '?page=3') {
 					return false;
 				}
 
-				url.pathname = '/?page=3';
+				url.search = '?page=3';
 
 				return {url};
 			}
@@ -216,7 +216,8 @@ test('throws if the `pagination` option does not have `filter` property', async 
 		_pagination: {
 			...resetPagination,
 			transform: thrower,
-			shouldContinue: thrower
+			shouldContinue: thrower,
+			paginate: thrower
 		},
 		prefixUrl: 'https://example.com'
 	});

@@ -15,8 +15,7 @@ test('`url` is required', async t => {
 		// @ts-ignore Error tests
 		got(''),
 		{
-			instanceOf: TypeError,
-			message: 'Invalid URL: '
+			message: 'Missing `url` property'
 		}
 	);
 });
@@ -88,7 +87,7 @@ test('throws an error when legacy URL is passed', withServer, async (t, server, 
 	await t.throwsAsync(
 		// @ts-ignore Error tests
 		got(parse(`${server.url}/test`)),
-		{message: 'The legacy `url.Url` is deprecated. Use `URL` instead.'}
+		{message: 'The legacy `url.Url` has been deprecated. Use `URL` instead.'}
 	);
 });
 

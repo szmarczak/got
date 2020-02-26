@@ -105,11 +105,15 @@ export default class PromisableRequest extends Request {
 				throw new Error('`options._pagination.shouldContinue` must be implemented');
 			}
 
+			if (!is.function_(pagination.filter)) {
+				throw new TypeError('`options._pagination.filter` must be implemented');
+			}
+
 			if (!is.function_(pagination.paginate)) {
 				throw new Error('`options._pagination.paginate` must be implemented');
 			}
-		} else if (defaults) {
-			options._pagination = defaults._pagination;
+		} else if (is.undefined(options._pagination)) {
+			options._pagination = defaults?._pagination;
 		}
 
 		return options;
