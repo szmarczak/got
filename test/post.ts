@@ -37,7 +37,6 @@ test('invalid body', async t => {
 		// @ts-ignore Error tests
 		got.post('https://example.com', {body: {}}),
 		{
-			instanceOf: TypeError,
 			message: 'The `body` option must be a stream.Readable, string or Buffer'
 		}
 	);
@@ -80,7 +79,6 @@ test('does NOT support sending arrays as forms', withServer, async (t, server, g
 	await t.throwsAsync(got.post({
 		form: ['such', 'wow']
 	}), {
-		instanceOf: TypeError,
 		message: 'Each query pair must be an iterable [name, value] tuple'
 	});
 });
@@ -213,7 +211,6 @@ test('`content-type` header is not overriden when object in `options.body`', wit
 test('throws when form body is not a plain object or array', async t => {
 	// @ts-ignore Manual test
 	await t.throwsAsync(got.post('https://example.com', {form: 'such=wow'}), {
-		instanceOf: TypeError,
 		message: 'The `form` option must be an Object'
 	});
 });

@@ -108,6 +108,11 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 					return;
 				}
 
+				if (!request.options) {
+					reject(error);
+					return;
+				}
+
 				let backoff: number;
 
 				retryCount++;

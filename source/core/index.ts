@@ -554,7 +554,12 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				this.finalized = true;
 				this.emit('finalized');
 			} catch (error) {
-				this._beforeError(error);
+				if (error instanceof RequestError) {
+					this._beforeError(error);
+					return;
+				}
+
+				this.destroy(error);
 			}
 		})(options);
 	}
@@ -921,7 +926,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				// body.
 				if (is.undefined(headers['content-length']) && is.undefined(headers['transfer-encoding'])) {
 					if (
-						(options.method === 'POST' || options.method === 'PUT' || options.method === 'PATCH') &&
+						(options.method === 'POST' || options.method === 'PUT' || options.method === 'PATCH' || !cannotHaveBody) &&
 						!is.undefined(uploadBodySize)
 					) {
 						headers['content-length'] = String(uploadBodySize);
@@ -1260,7 +1265,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				this._onResponse(requestOrResponse as unknown as IncomingMessage);
 			}
 		} catch (error) {
-			if (error instanceof CacheError) {
+			if (error instanceof RequestError) {
 				throw error;
 			}
 
