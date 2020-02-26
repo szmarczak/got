@@ -113,6 +113,8 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 					return;
 				}
 
+				// If the error is an instance of HTTPError, it should be handled by the `response` event.
+
 				let backoff: number;
 
 				retryCount++;
