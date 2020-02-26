@@ -87,19 +87,17 @@ export type InitHook = (options: Options & {url: string | URL}) => Promisable<vo
 export type BeforeRequestHook = (options: NormalizedOptions) => Promisable<void | Response | ResponseLike>;
 export type BeforeRedirectHook = (options: NormalizedOptions, response: Response) => Promisable<void>;
 export type BeforeErrorHook = (error: RequestError) => Promisable<RequestError>;
-export type AfterResponseHook = (response: Response, retryWithMergedOptions: (options: Options) => RequestError) => Response | Promise<Response> | RequestError;
 
 export interface Hooks {
 	init?: InitHook[];
 	beforeRequest?: BeforeRequestHook[];
 	beforeRedirect?: BeforeRedirectHook[];
 	beforeError?: BeforeErrorHook[];
-	afterResponse?: AfterResponseHook[];
 }
 
-export type HookEvent = 'init' | 'beforeRequest' | 'beforeRedirect' | 'beforeError' | 'afterResponse';
+export type HookEvent = 'init' | 'beforeRequest' | 'beforeRedirect' | 'beforeError';
 
-export const knownHookEvents: HookEvent[] = ['init', 'beforeRequest', 'beforeRedirect', 'beforeError', 'afterResponse'];
+export const knownHookEvents: HookEvent[] = ['init', 'beforeRequest', 'beforeRedirect', 'beforeError'];
 
 export type RequestFunction<T = IncomingMessage | ResponseLike> = (url: URL, options: RequestOptions, callback?: (response: T) => void) => ClientRequest | T | Promise<ClientRequest> | Promise<T> | undefined;
 
@@ -516,20 +514,18 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				}
 
 				const initHooks = nonNormalizedOptions.hooks?.init;
-				const hasInitHooks = initHooks && initHooks.length !== 0;
-				if (hasInitHooks) {
+				if (initHooks && initHooks.length !== 0) {
 					nonNormalizedOptions.url = url;
 
-					for (const hook of initHooks!) {
+					for (const hook of initHooks) {
 						// eslint-disable-next-line no-await-in-loop
 						await hook(nonNormalizedOptions as Options & {url: string | URL});
 					}
 
-					url = nonNormalizedOptions.url;
 					nonNormalizedOptions.url = undefined;
 				}
 
-				if (kIsNormalizedAlready in nonNormalizedOptions && !hasInitHooks) {
+				if (kIsNormalizedAlready in nonNormalizedOptions) {
 					this.options = nonNormalizedOptions as NormalizedOptions;
 				} else {
 					// @ts-ignore Common TypeScript bug saying that `this.constructor` is not accessible
@@ -1050,26 +1046,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			return;
 		}
 
-		try {
-			const afterResponse = options.hooks.afterResponse.slice();
-
-			for (const hook of afterResponse) {
-				options.hooks.afterResponse.shift();
-
-				// eslint-disable-next-line no-await-in-loop
-				const result = await hook(typedResponse, this._afterResponse.bind(this));
-
-				if (result instanceof RequestError) {
-					throw result;
-				}
-
-				response = result;
-			}
-		} catch (error) {
-			this._beforeError(error);
-			return;
-		}
-
 		const limitStatusCode = options.followRedirect ? 299 : 399;
 		const isOk = (statusCode >= 200 && statusCode <= limitStatusCode) || statusCode === 304;
 		if (options.throwHttpErrors && !isOk) {
@@ -1471,17 +1447,5 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		super.unpipe(destination);
 
 		return this;
-	}
-
-	_afterResponse(options: Options): RequestError {
-		const error = new RequestError('Retrying...', {}, this.options);
-		error.code = 'GOT_RETRY';
-
-		const normalizedOptions = this.constructor.normalizeArguments(undefined, options, this.options);
-		normalizedOptions[kIsNormalizedAlready] = true;
-
-		(error as any)._options = normalizedOptions;
-
-		return error;
 	}
 }

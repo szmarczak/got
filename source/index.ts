@@ -35,8 +35,7 @@ const defaults: InstanceDefaults = {
 				'EPIPE',
 				'ENOTFOUND',
 				'ENETUNREACH',
-				'EAI_AGAIN',
-				'GOT_RETRY'
+				'EAI_AGAIN'
 			],
 			maxRetryAfter: undefined,
 			calculateDelay: ({computedValue}) => computedValue
