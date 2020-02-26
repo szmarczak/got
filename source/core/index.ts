@@ -847,8 +847,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				throw new TypeError('The `form` option must be an Object');
 			}
 
-			this[kIsWriteLocked] = false;
-
 			const lockWrite = (): void => {
 				this[kIsWriteLocked] = true;
 			};
@@ -888,6 +886,10 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 					}
 
 					options.body = JSON.stringify(options.json);
+				}
+
+				if (!isFormData(options.body)) {
+					lockWrite();
 				}
 
 				const uploadBodySize = await getBodySize(options);
@@ -1321,8 +1323,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	}
 
 	_final(callback: (error?: Error | null) => void): void {
-		this[kIsWriteLocked] = true;
-
 		const endRequest = (): void => {
 			// We need to check if `this[kRequest]` is present,
 			// because it isn't when we use cache.
