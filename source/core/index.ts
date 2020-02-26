@@ -930,6 +930,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			}
 		} else if (cannotHaveBody) {
 			this._lockWrite();
+		} else {
+			this._unlockWrite();
 		}
 
 		this[kBodySize] = Number(headers['content-length']) || undefined;
