@@ -58,11 +58,9 @@ export interface RequiredRetryOptions {
 }
 
 export type BeforeRetryHook = (options: NormalizedOptions, error?: RequestError, retryCount?: number) => void | Promise<void>;
-export type AfterResponseHook = (response: Response, retryWithMergedOptions: (options: Options) => CancelableRequest<Response>) => Response | CancelableRequest<Response> | Promise<Response | CancelableRequest<Response>>;
 
 export interface Hooks extends RequestHooks {
 	beforeRetry?: BeforeRetryHook[];
-	afterResponse?: AfterResponseHook[];
 }
 
 export interface PaginationOptions<T> {
@@ -121,7 +119,7 @@ export interface CancelableRequest<T extends Response | Response['body'] = Respo
 	text(): CancelableRequest<string>;
 }
 
-export type HookEvent = RequestHookEvent | 'beforeRetry' | 'afterResponse';
+export type HookEvent = RequestHookEvent | 'beforeRetry';
 
 export {
 	RequestError,

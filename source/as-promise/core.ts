@@ -10,7 +10,7 @@ import {
 import Request, {knownHookEvents, RequestError, HTTPError} from '../core';
 
 if (!knownHookEvents.includes('beforeRetry' as any)) {
-	knownHookEvents.push('beforeRetry' as any, 'afterResponse' as any);
+	knownHookEvents.push('beforeRetry' as any);
 }
 
 export const knownBodyTypes = ['json', 'buffer', 'text'];

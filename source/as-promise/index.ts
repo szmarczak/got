@@ -62,44 +62,6 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 					return;
 				}
 
-				try {
-					for (const [index, hook] of options.hooks.afterResponse.entries()) {
-						// @ts-ignore TS doesn't notice that CancelableRequest is a Promise
-						// eslint-disable-next-line no-await-in-loop
-						response = await hook(response, async (updatedOptions): CancelableRequest<Response> => {
-							const typedOptions = request.constructor.normalizeArguments(undefined, {
-								...updatedOptions,
-								retry: {
-									calculateDelay: () => 0
-								},
-								throwHttpErrors: false,
-								resolveBodyOnly: false
-							}, options);
-
-							// Remove any further hooks for that request, because we'll call them anyway.
-							// The loop continues. We don't want duplicates (asPromise recursion).
-							typedOptions.hooks.afterResponse = typedOptions.hooks.afterResponse.slice(0, index);
-
-							for (const hook of typedOptions.hooks.beforeRetry) {
-								// eslint-disable-next-line no-await-in-loop
-								await hook(typedOptions);
-							}
-
-							const promise: CancelableRequest<Response> = asPromise(typedOptions);
-
-							onCancel(() => {
-								promise.catch(() => {});
-								promise.cancel();
-							});
-
-							return promise;
-						});
-					}
-				} catch (error) {
-					request._beforeError(error);
-					return;
-				}
-
 				resolve(options.resolveBodyOnly ? response.body as T : response as unknown as T);
 			});
 
@@ -115,7 +77,11 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 
 				let backoff: number;
 
-				retryCount++;
+				if (error.code !== 'GOT_RETRY') {
+					retryCount++;
+				} else {
+					options = (error as any)._options;
+				}
 
 				try {
 					backoff = options.retry.calculateDelay({
@@ -156,7 +122,7 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 
 					setTimeout(retry, backoff);
 					return;
-				} else {
+				} else if (error.code !== 'GOT_RETRY') {
 					// No retry has been made
 					retryCount--;
 				}

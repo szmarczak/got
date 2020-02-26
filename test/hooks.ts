@@ -105,12 +105,16 @@ test('catches afterResponse thrown errors', withServer, async (t, server, got) =
 	}), {message: errorString});
 });
 
-test('throws a helpful error when passing async function as init hook', async t => {
-	await t.throwsAsync(got('https://example.com', {
+test('accepts async init hook', async t => {
+	await got('https://example.com', {
 		hooks: {
-			init: [async () => {}]
+			init: [
+				async () => {
+					t.pass();
+				}
+			]
 		}
-	}), {message: 'The `init` hook must be a synchronous function'});
+	});
 });
 
 test('catches beforeRequest promise rejections', async t => {
@@ -193,7 +197,6 @@ test('init is called with options', withServer, async (t, server, got) => {
 		hooks: {
 			init: [
 				options => {
-					t.is(options.url, undefined);
 					t.is(options.context, context);
 				}
 			]
@@ -211,7 +214,6 @@ test('init from defaults is called with options', withServer, async (t, server, 
 		hooks: {
 			init: [
 				options => {
-					t.is(options.url, undefined);
 					t.is(options.context, context);
 				}
 			]
@@ -355,7 +357,7 @@ test('afterResponse is called with response', withServer, async (t, server, got)
 		hooks: {
 			afterResponse: [
 				response => {
-					t.is(typeof response.body, 'object');
+					t.is(typeof response.statusCode, 'number');
 
 					return response;
 				}
@@ -367,19 +369,19 @@ test('afterResponse is called with response', withServer, async (t, server, got)
 test('afterResponse allows modifications', withServer, async (t, server, got) => {
 	server.get('/', echoHeaders);
 
-	const {body} = await got({
+	const {statusCode} = await got({
 		responseType: 'json',
 		hooks: {
 			afterResponse: [
 				response => {
-					response.body = {hello: 'world'};
+					response.statusCode = 202;
 
 					return response;
 				}
 			]
 		}
 	});
-	t.is(body.hello, 'world');
+	t.is(statusCode, 202);
 });
 
 test('afterResponse allows to retry', withServer, async (t, server, got) => {
@@ -659,7 +661,7 @@ test('beforeError allows modifications', async t => {
 				error => {
 					const newError = new Error(errorString2);
 
-					return new RequestError(errorString, newError, error.options);
+					return new RequestError(newError.message, newError, error.options);
 				}
 			]
 		}
