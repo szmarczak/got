@@ -113,7 +113,7 @@ export interface Options extends SecureContextOptions {
 	url?: string | URL;
 	cookieJar?: PromiseCookieJar | ToughCookieJar;
 	ignoreInvalidCookies?: boolean;
-	encoding?: string;
+	encoding?: BufferEncoding;
 	searchParams?: string | {[key: string]: string | number | boolean | null} | URLSearchParams;
 	dnsCache?: CacheableLookup | boolean;
 	context?: object;
@@ -474,8 +474,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			options = {};
 		}
 
-		const unlockWrite = () => this._unlockWrite();
-		const lockWrite = () => this._lockWrite();
+		const unlockWrite = (): void => this._unlockWrite();
+		const lockWrite = (): void => this._lockWrite();
 
 		this.on('pipe', (source: Writable) => {
 			source.prependListener('data', unlockWrite);
@@ -546,11 +546,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				decodeURI(this.requestUrl);
 
 				await this.finalizeBody();
-
-				if (options.encoding) {
-					this.setEncoding(options.encoding);
-				}
-
 				await this.makeRequest();
 
 				this.finalized = true;
@@ -730,7 +725,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			}
 
 			if (options.url) {
-				(options.url as URL).search = options.searchParams.toString();
+				options.url.search = options.searchParams.toString();
 			}
 		} else if (!is.undefined(options.searchParams)) {
 			throw new TypeError(`Parameter \`searchParams\` must be an object or a string, not ${is(options.searchParams)}`);
@@ -829,7 +824,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		if (options.agent) {
 			for (const key in options.agent) {
 				if (key !== 'http' && key !== 'https' && key !== 'http2') {
-					throw new TypeError(`Expected the \`options.agent\` properties to be \`http\`, \`https\` or \`http2\`, got ${key}`);
+					throw new TypeError(`Expected the \`options.agent\` properties to be \`http\`, \`https\` or \`http2\`, got \`${key}\``);
 				}
 			}
 		}
@@ -844,7 +839,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		assert.any([is.boolean, is.undefined], options.http2);
 		assert.any([is.boolean, is.undefined], options.allowGetBody);
 		assert.any([is.boolean, is.undefined], options.rejectUnauthorized);
-		assert.any([is.plainObject, is.undefined], options.agent);
+		assert.any([is.plainObject, is.undefined, is.boolean], options.agent);
 
 		options.decompress = Boolean(options.decompress);
 		options.ignoreInvalidCookies = Boolean(options.ignoreInvalidCookies);
@@ -861,8 +856,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		return options as NormalizedOptions;
 	}
 
-	_lockWrite() {
-		const onLockedWrite = () => {
+	_lockWrite(): void {
+		const onLockedWrite = (): never => {
 			throw new TypeError('The payload has been already provided');
 		};
 
@@ -870,7 +865,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		this.end = onLockedWrite;
 	}
 
-	_unlockWrite() {
+	_unlockWrite(): void {
 		this.write = super.write;
 		this.end = super.end;
 	}
@@ -950,6 +945,10 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 					}
 				}
 			}
+		} else if (cannotHaveBody) {
+			this._lockWrite();
+		} else {
+			this._unlockWrite();
 		}
 
 		this[kBodySize] = Number(headers['content-length']) || undefined;
@@ -1059,6 +1058,33 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			return;
 		}
 
+		// We need to call `_read()` only when the Request stream is flowing
+		response.on('readable', () => {
+			console.log('readable');
+			if ((this as any).readableFlowing) {
+				console.log('read');
+				this._read();
+			}
+		});
+
+		this.on('resume', () => {
+			console.log('resume');
+			response.resume();
+		});
+
+		this.on('pause', () => {
+			console.log('pause');
+			response.pause();
+		});
+
+		response.once('end', () => {
+			console.log('ended');
+			this[kResponseSize] = this[kDownloadedSize];
+			this.emit('downloadProgress', this.downloadProgress);
+
+			this.push(null);
+		});
+
 		const limitStatusCode = options.followRedirect ? 299 : 399;
 		const isOk = (statusCode >= 200 && statusCode <= limitStatusCode) || statusCode === 304;
 		if (options.throwHttpErrors && !isOk) {
@@ -1068,30 +1094,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				return;
 			}
 		}
-
-		// We need to call `_read()` only when the Request stream is flowing
-		response.on('readable', () => {
-			if ((this as any).readableFlowing) {
-				this._read();
-			}
-		});
-
-		this.on('resume', () => {
-			response.resume();
-		});
-
-		this.on('pause', () => {
-			response.pause();
-		});
-
-		this.emit('downloadProgress', this.downloadProgress);
-
-		response.once('end', () => {
-			this[kResponseSize] = this[kDownloadedSize];
-			this.emit('downloadProgress', this.downloadProgress);
-
-			this.push(null);
-		});
 
 		response.on('error', (error: Error) => {
 			this._beforeError(new ReadError(error, options, response as Response));
@@ -1117,11 +1119,13 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		this[kResponseSize] = Number(response.headers['content-length']) || undefined;
 
+		this.emit('downloadProgress', this.downloadProgress);
+
 		this[kResponse] = response;
 		this.emit('response', response);
 	}
 
-	_onRequest(request: ClientRequest) {
+	_onRequest(request: ClientRequest): void {
 		const {options} = this;
 		const {timeout, url} = options;
 
@@ -1173,7 +1177,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		} else {
 			this._unlockWrite();
 
-			if (options.body) {
+			if (!is.undefined(options.body)) {
 				this._writeRequest(options.body, null as unknown as string, () => {});
 				currentRequest.end();
 
@@ -1303,8 +1307,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		try {
 			const {response} = error;
 			if (response && is.undefined(response.body)) {
-				const body = await getStream.buffer(this);
-				response.body = body;
+				response.body = await getStream.buffer(this, this.options);
 			}
 		} catch (_) {}
 
@@ -1334,6 +1337,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 					this.emit('downloadProgress', progress);
 				}
 
+				console.log(data);
 				this.push(data);
 			}
 		}
@@ -1423,8 +1427,14 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	}
 
 	get downloadProgress(): Progress {
-		const percent = this[kResponseSize] === this[kDownloadedSize] ? 1 :
-						(this[kResponseSize] ? this[kDownloadedSize] / this[kResponseSize]! : 0);
+		let percent;
+		if (this[kResponseSize]) {
+			percent = this[kDownloadedSize] / this[kResponseSize]!;
+		} else if (this[kResponseSize] === this[kDownloadedSize]) {
+			percent = 1;
+		} else {
+			percent = 0;
+		}
 
 		return {
 			percent,
@@ -1434,8 +1444,14 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	}
 
 	get uploadProgress(): Progress {
-		const percent = this[kBodySize] === this[kUploadedSize] ? 1 :
-						(this[kBodySize] ? this[kUploadedSize] / this[kBodySize]! : 0);
+		let percent;
+		if (this[kBodySize]) {
+			percent = this[kUploadedSize] / this[kBodySize]!;
+		} else if (this[kBodySize] === this[kUploadedSize]) {
+			percent = 1;
+		} else {
+			percent = 0;
+		}
 
 		return {
 			percent,

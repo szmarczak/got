@@ -53,7 +53,7 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 
 				// Download body
 				try {
-					body = await getStream.buffer(request);
+					body = await getStream.buffer(request, options);
 				} catch (error) {
 					request._beforeError(new ReadError(error, options, response));
 					return;
@@ -61,10 +61,10 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 
 				// Parse body
 				try {
-					response!.body = parseBody(body, options.responseType, options.encoding);
+					response.body = parseBody(body, options.responseType);
 				} catch (error) {
 					// Fallback to `utf8`
-					response!.body = body.toString('utf8');
+					response.body = body.toString('utf8');
 
 					if (isOk()) {
 						const parseError = new ParseError(error, response, options);
@@ -180,10 +180,10 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 
 					setTimeout(retry, backoff);
 					return;
-				} else {
-					// The retry has not been made
-					retryCount--;
 				}
+
+				// The retry has not been made
+				retryCount--;
 
 				if (error instanceof HTTPError) {
 					// It will be handled by the `response` event
@@ -216,7 +216,7 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 	const shortcut = <T>(responseType: NormalizedOptions['responseType']): CancelableRequest<T> => {
 		const newPromise = (async () => {
 			await promise;
-			return parseBody(body, responseType, options.encoding);
+			return parseBody(body, responseType);
 		})();
 
 		Object.defineProperties(newPromise, Object.getOwnPropertyDescriptors(promise));

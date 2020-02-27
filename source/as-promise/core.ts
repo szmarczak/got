@@ -15,9 +15,9 @@ if (!knownHookEvents.includes('beforeRetry' as any)) {
 export const knownBodyTypes = ['json', 'buffer', 'text'];
 
 // @ts-ignore The error is: Not all code paths return a value.
-export const parseBody = (body: Buffer, responseType: ResponseType, encoding: NormalizedOptions['encoding']): unknown => {
+export const parseBody = (body: Buffer, responseType: ResponseType): unknown => {
 	if (responseType === 'text') {
-		return body.toString(encoding);
+		return body.toString();
 	}
 
 	if (responseType === 'json') {
@@ -127,7 +127,8 @@ export default class PromisableRequest extends Request {
 				error = await hook(error);
 			}
 		} catch (error_) {
-			error = error_;
+			this.destroy(error_);
+			return;
 		}
 
 		if (this._throwHttpErrors && !isHTTPError) {

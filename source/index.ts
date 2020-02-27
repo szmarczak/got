@@ -111,13 +111,6 @@ const got = create(defaults);
 
 export default got;
 
-// TODO:
-// - fix test/progress.ts
-
-/*
-clear && npm run build && ava test/hooks.ts test/pagination.ts test/unix-socket.ts test/post.ts test/agent.ts test/arguments.ts test/cache.ts test/cancel.ts test/cookies.ts test/create.ts test/error.ts test/gzip.ts test/headers.ts test/helpers.ts test/http.ts test/https.ts test/merge-instances.ts test/normalize-arguments.ts test/promise.ts test/redirects.ts test/response-parse.ts test/retry.ts test/socket-destroyed.ts test/stream.ts test/timeout.ts test/url-to-options.ts
-*/
-
 // For CommonJS default export support
 module.exports = got;
 module.exports.default = got;

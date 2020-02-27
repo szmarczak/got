@@ -28,15 +28,13 @@ const checkEvents: Macro<[Progress[], number?]> = (t, events, bodySize = undefin
 			t.is(event.percent, event.transferred / bodySize);
 			t.true(event.percent > lastEvent.percent);
 			t.true(event.transferred > lastEvent.transferred);
+		} else if (isLastEvent) {
+			t.is(event.percent, 1);
+			t.is(event.transferred, lastEvent.transferred);
+			t.is(event.total, event.transferred);
 		} else {
-			if (isLastEvent) {
-				t.is(event.percent, 1);
-				t.is(event.transferred, lastEvent.transferred);
-				t.is(event.total, event.transferred);
-			} else {
-				t.is(event.percent, 0);
-				t.true(event.transferred > lastEvent.transferred);
-			}
+			t.is(event.percent, 0);
+			t.true(event.transferred > lastEvent.transferred);
 		}
 
 		lastEvent = event;
