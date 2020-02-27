@@ -52,7 +52,7 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 
 				// Download body
 				try {
-					body = await getStream.buffer(response, {encoding: 'binary'});
+					body = await getStream.buffer(request);
 				} catch (error) {
 					request._beforeError(new ReadError(error, options, response));
 					return;

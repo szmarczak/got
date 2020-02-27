@@ -36,6 +36,7 @@ const kServerResponsesPiped = Symbol('serverResponsesPiped');
 const kUnproxyEvents = Symbol('unproxyEvents');
 const kIsFromCache = Symbol('isFromCache');
 const kCancelTimeouts = Symbol('cancelTimeouts');
+const kStartedReading = Symbol('startedReading');
 export const kIsNormalizedAlready = Symbol('isNormalizedAlready');
 
 const supportsBrotli = is.string((process.versions as any).brotli);
@@ -447,6 +448,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	declare [kResponseSize]?: number;
 	declare [kUnproxyEvents]: () => void;
 	declare [kCancelTimeouts]: () => void;
+	declare [kStartedReading]: boolean;
+	declare waiting: boolean;
 	[kDownloadedSize]: number;
 	[kUploadedSize]: number;
 	[kBodySize]?: number;
@@ -1063,11 +1066,9 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 
 		// We need to call `_read()` only when the Request stream is flowing
-		response.once('readable', () => {
+		response.on('readable', () => {
 			if ((this as any).readableFlowing) {
 				this._read();
-
-				response.resume();
 			}
 		});
 
@@ -1287,7 +1288,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		try {
 			const {response} = error;
 			if (response && is.undefined(response.body)) {
-				const body = await getStream.buffer(response);
+				const body = await getStream.buffer(this);
 				response.body = body;
 			}
 		} catch (_) {}
@@ -1406,8 +1407,11 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	}
 
 	get downloadProgress(): Progress {
+		const percent = this[kResponseSize] === this[kDownloadedSize] ? 1 :
+						(this[kResponseSize] ? this[kDownloadedSize] / this[kResponseSize]! : 0);
+
 		return {
-			percent: this[kResponseSize] ? this[kDownloadedSize] / this[kResponseSize]! : 0,
+			percent,
 			transferred: this[kDownloadedSize],
 			total: this[kResponseSize]
 		};
@@ -1434,7 +1438,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	}
 
 	pipe<T extends NodeJS.WritableStream>(destination: T, options?: {end?: boolean}): T {
-		if (this.downloadProgress.transferred > 0) {
+		if (this[kStartedReading]) {
 			throw new Error('Failed to pipe. The response has been emitted already.');
 		}
 
