@@ -33,6 +33,7 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 
 			const request = new PromisableRequest(options.url, options);
 			request._throwHttpErrors = throwHttpErrors;
+			request._noPipe = true;
 			onCancel(() => request.destroy());
 
 			request.once('response', async (response: Response) => {

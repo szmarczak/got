@@ -108,14 +108,12 @@ test('download progress - stream', withServer, async (t, server, got) => {
 	checkEvents(t, events, file.length);
 });
 
-test.only('upload progress - file', withServer, async (t, server, got) => {
+test('upload progress - file', withServer, async (t, server, got) => {
 	server.post('/', uploadEndpoint);
 
 	const events: Progress[] = [];
 
 	await got.post({body: file}).on('uploadProgress', (event: Progress) => events.push(event));
-
-	console.log(events);
 
 	checkEvents(t, events, file.length);
 });
@@ -207,7 +205,7 @@ test('upload progress - no body', withServer, async (t, server, got) => {
 		{
 			percent: 0,
 			transferred: 0,
-			total: 0
+			total: undefined
 		},
 		{
 			percent: 1,

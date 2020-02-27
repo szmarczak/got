@@ -439,18 +439,19 @@ export class UnsupportedProtocolError extends RequestError {
 export default class Request extends Duplex implements RequestEvents<Request> {
 	['constructor']: typeof Request;
 
-	declare [kRequest]: ClientRequest;
-	declare [kResponse]: IncomingMessage;
-	declare [kResponseSize]?: number;
 	declare [kUnproxyEvents]: () => void;
-	declare [kCancelTimeouts]: () => void;
-	declare [kStartedReading]: boolean;
-	declare waiting: boolean;
+	declare _cannotHaveBody: boolean;
 	[kDownloadedSize]: number;
 	[kUploadedSize]: number;
 	[kBodySize]?: number;
 	[kServerResponsesPiped]: Set<ServerResponse>;
 	[kIsFromCache]?: boolean;
+	[kStartedReading]?: boolean;
+	[kCancelTimeouts]?: () => void;
+	[kResponseSize]?: number;
+	[kResponse]?: IncomingMessage;
+	[kRequest]?: ClientRequest;
+	_noPipe?: boolean;
 
 	declare options: NormalizedOptions;
 	declare requestUrl: string;
@@ -883,6 +884,9 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		const isBody = !is.undefined(options.body);
 		const hasPayload = isForm || isJSON || isBody;
 		const cannotHaveBody = withoutBody.has(options.method) && !(options.method === 'GET' && options.allowGetBody);
+
+		this._cannotHaveBody = cannotHaveBody;
+
 		if (hasPayload) {
 			if (cannotHaveBody) {
 				throw new TypeError(`The \`${options.method}\` method cannot be used with a body`);
@@ -941,18 +945,11 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				// a payload body and the method semantics do not anticipate such a
 				// body.
 				if (is.undefined(headers['content-length']) && is.undefined(headers['transfer-encoding'])) {
-					if (
-						(options.method === 'POST' || options.method === 'PUT' || options.method === 'PATCH' || !cannotHaveBody) &&
-						!is.undefined(uploadBodySize)
-					) {
+					if (!cannotHaveBody && !is.undefined(uploadBodySize)) {
 						headers['content-length'] = String(uploadBodySize);
 					}
 				}
 			}
-		} else if (cannotHaveBody) {
-			this._lockWrite();
-		} else {
-			this._unlockWrite();
 		}
 
 		this[kBodySize] = Number(headers['content-length']) || undefined;
@@ -998,7 +995,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		if (options.followRedirect && response.headers.location && redirectCodes.has(statusCode)) {
 			response.resume(); // We're being redirected, we don't care about the response.
 			if (this[kCancelTimeouts]) {
-				this[kCancelTimeouts]();
+				this[kCancelTimeouts]!();
 			}
 
 			// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -1178,11 +1175,14 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 			if (options.body) {
 				this._writeRequest(options.body, null as unknown as string, () => {});
+				currentRequest.end();
+
+				this._lockWrite();
+			} else if (this._cannotHaveBody || this._noPipe) {
+				currentRequest.end();
+
+				this._lockWrite();
 			}
-
-			currentRequest.end();
-
-			this._lockWrite();
 		}
 
 		this.emit('request', request);
@@ -1324,8 +1324,9 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		if (kResponse in this) {
 			let data;
 
-			while ((data = this[kResponse].read()) !== null) {
+			while ((data = this[kResponse]!.read()) !== null) {
 				this[kDownloadedSize] += data.length;
+				this[kStartedReading] = true;
 
 				const progress = this.downloadProgress;
 
@@ -1353,7 +1354,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	}
 
 	_writeRequest(chunk: any, encoding: string, callback: (error?: Error | null) => void): void {
-		this[kRequest].write(chunk, encoding, (error?: Error | null) => {
+		this[kRequest]!.write(chunk, encoding, (error?: Error | null) => {
 			if (!error) {
 				this[kUploadedSize] += Buffer.byteLength(chunk, encoding as BufferEncoding);
 
@@ -1376,12 +1377,12 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				return;
 			}
 
-			this[kRequest].end((error?: Error | null) => {
+			this[kRequest]!.end((error?: Error | null) => {
 				if (!error) {
 					this[kBodySize] = this[kUploadedSize];
 
 					this.emit('uploadProgress', this.uploadProgress);
-					this[kRequest].emit('upload-complete');
+					this[kRequest]!.emit('upload-complete');
 				}
 
 				callback(error);
@@ -1397,11 +1398,11 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 	_destroy(error: Error | null, callback: (error: Error | null) => void): void {
 		if (kRequest in this) {
-			this[kRequest].abort();
+			this[kRequest]!.abort();
 		} else {
 			this.once('finalized', (): void => {
 				if (kRequest in this) {
-					this[kRequest].abort();
+					this[kRequest]!.abort();
 				}
 			});
 		}
@@ -1413,7 +1414,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		callback(error);
 	}
 
-	get socket(): Socket {
+	get socket(): Socket | undefined {
 		return this[kRequest]?.socket;
 	}
 
@@ -1433,8 +1434,11 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	}
 
 	get uploadProgress(): Progress {
+		const percent = this[kBodySize] === this[kUploadedSize] ? 1 :
+						(this[kBodySize] ? this[kUploadedSize] / this[kBodySize]! : 0);
+
 		return {
-			percent: this[kBodySize] ? this[kUploadedSize] / this[kBodySize]! : 0,
+			percent,
 			transferred: this[kUploadedSize],
 			total: this[kBodySize]
 		};
