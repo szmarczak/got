@@ -53,7 +53,7 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 
 				// Download body
 				try {
-					body = await getStream.buffer(request, options);
+					body = await getStream.buffer(request);
 				} catch (error) {
 					request._beforeError(new ReadError(error, options, response));
 					return;
@@ -61,7 +61,7 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 
 				// Parse body
 				try {
-					response.body = parseBody(body, options.responseType);
+					response.body = parseBody(body, options.responseType, options.encoding);
 				} catch (error) {
 					// Fallback to `utf8`
 					response.body = body.toString('utf8');

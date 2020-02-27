@@ -1058,33 +1058,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			return;
 		}
 
-		// We need to call `_read()` only when the Request stream is flowing
-		response.on('readable', () => {
-			console.log('readable');
-			if ((this as any).readableFlowing) {
-				console.log('read');
-				this._read();
-			}
-		});
-
-		this.on('resume', () => {
-			console.log('resume');
-			response.resume();
-		});
-
-		this.on('pause', () => {
-			console.log('pause');
-			response.pause();
-		});
-
-		response.once('end', () => {
-			console.log('ended');
-			this[kResponseSize] = this[kDownloadedSize];
-			this.emit('downloadProgress', this.downloadProgress);
-
-			this.push(null);
-		});
-
 		const limitStatusCode = options.followRedirect ? 299 : 399;
 		const isOk = (statusCode >= 200 && statusCode <= limitStatusCode) || statusCode === 304;
 		if (options.throwHttpErrors && !isOk) {
@@ -1094,6 +1067,31 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				return;
 			}
 		}
+
+		this[kResponseSize] = Number(response.headers['content-length']) || undefined;
+		this[kResponse] = response;
+
+		// We need to call `_read()` only when the Request stream is flowing
+		response.on('readable', () => {
+			if ((this as any).readableFlowing) {
+				this._read();
+			}
+		});
+
+		this.on('resume', () => {
+			response.resume();
+		});
+
+		this.on('pause', () => {
+			response.pause();
+		});
+
+		response.once('end', () => {
+			this[kResponseSize] = this[kDownloadedSize];
+			this.emit('downloadProgress', this.downloadProgress);
+
+			this.push(null);
+		});
 
 		response.on('error', (error: Error) => {
 			this._beforeError(new ReadError(error, options, response as Response));
@@ -1117,11 +1115,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			destination.statusCode = statusCode;
 		}
 
-		this[kResponseSize] = Number(response.headers['content-length']) || undefined;
-
 		this.emit('downloadProgress', this.downloadProgress);
-
-		this[kResponse] = response;
 		this.emit('response', response);
 	}
 
@@ -1307,7 +1301,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		try {
 			const {response} = error;
 			if (response && is.undefined(response.body)) {
-				response.body = await getStream.buffer(this, this.options);
+				response.body = await getStream.buffer(response, this.options);
 			}
 		} catch (_) {}
 
@@ -1337,7 +1331,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 					this.emit('downloadProgress', progress);
 				}
 
-				console.log(data);
 				this.push(data);
 			}
 		}

@@ -602,7 +602,7 @@ test('throwing in a beforeError hook - promise', withServer, async (t, server, g
 	}), {message: 'foobar'});
 });
 
-test.only('throwing in a beforeError hook - stream', withServer, async (t, _server, got) => {
+test('throwing in a beforeError hook - stream', withServer, async (t, _server, got) => {
 	// @ts-ignore Error tests
 	await t.throwsAsync(getStream(got.stream({
 		hooks: {
