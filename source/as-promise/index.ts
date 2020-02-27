@@ -179,6 +179,9 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 
 					setTimeout(retry, backoff);
 					return;
+				} else {
+					// The retry has not been made
+					retryCount--;
 				}
 
 				if (error instanceof HTTPError) {
