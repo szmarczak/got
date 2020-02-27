@@ -43,6 +43,13 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 					return;
 				}
 
+				const isOk = (): boolean => {
+					const {statusCode} = response;
+					const limitStatusCode = options.followRedirect ? 299 : 399;
+
+					return (statusCode >= 200 && statusCode <= limitStatusCode) || statusCode === 304;
+				};
+
 				// Download body
 				try {
 					body = await getStream.buffer(response, {encoding: 'binary'});
@@ -55,11 +62,14 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 				try {
 					response!.body = parseBody(body, options.responseType, options.encoding);
 				} catch (error) {
-					response!.body = body.toString();
+					// Fallback to `utf8`
+					response!.body = body.toString('utf8');
 
-					const parseError = new ParseError(error, response, options);
-					request._beforeError(parseError);
-					return;
+					if (isOk()) {
+						const parseError = new ParseError(error, response, options);
+						request._beforeError(parseError);
+						return;
+					}
 				}
 
 				try {
@@ -67,7 +77,9 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 						// @ts-ignore TS doesn't notice that CancelableRequest is a Promise
 						// eslint-disable-next-line no-await-in-loop
 						response = await hook(response, async (updatedOptions): CancelableRequest<Response> => {
-							const typedOptions = request.constructor.normalizeArguments(undefined, {
+							request.destroy();
+
+							const typedOptions = PromisableRequest.normalizeArguments(undefined, {
 								...updatedOptions,
 								retry: {
 									calculateDelay: () => 0
@@ -100,6 +112,11 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 					return;
 				}
 
+				if (throwHttpErrors && !isOk()) {
+					reject(new HTTPError(response, options));
+					return;
+				}
+
 				resolve(options.resolveBodyOnly ? response.body as T : response as unknown as T);
 			});
 
@@ -112,8 +129,6 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 					reject(error);
 					return;
 				}
-
-				// If the error is an instance of HTTPError, it should be handled by the `response` event.
 
 				let backoff: number;
 
@@ -132,8 +147,10 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 						})
 					});
 				} catch (error_) {
+					// Don't emit the `response` event
 					request.destroy();
-					reject(error_);
+
+					reject(new RequestError(error_.message, error, request.options));
 					return;
 				}
 
@@ -142,28 +159,30 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 					request.destroy();
 
 					const retry = async (): Promise<void> => {
+						options.throwHttpErrors = throwHttpErrors;
+
 						try {
 							for (const hook of options.hooks.beforeRetry) {
 								// eslint-disable-next-line no-await-in-loop
 								await hook(options, error, retryCount);
 							}
 						} catch (error_) {
-							request._beforeError(error_);
+							// Don't emit the `response` event
+							request.destroy();
+
+							reject(new RequestError(error_.message, error, request.options));
 							return;
 						}
 
-						options.throwHttpErrors = throwHttpErrors;
 						makeRequest();
 					};
 
 					setTimeout(retry, backoff);
 					return;
-				} else {
-					// No retry has been made
-					retryCount--;
 				}
 
-				if (!throwHttpErrors && error instanceof HTTPError) {
+				if (error instanceof HTTPError) {
+					// It will be handled by the `response` event
 					return;
 				}
 

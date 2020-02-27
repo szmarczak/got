@@ -35,6 +35,7 @@ const kUploadedSize = Symbol('uploadedSize');
 const kServerResponsesPiped = Symbol('serverResponsesPiped');
 const kUnproxyEvents = Symbol('unproxyEvents');
 const kIsFromCache = Symbol('isFromCache');
+const kCancelTimeouts = Symbol('cancelTimeouts');
 export const kIsNormalizedAlready = Symbol('isNormalizedAlready');
 
 const supportsBrotli = is.string((process.versions as any).brotli);
@@ -445,6 +446,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	declare [kResponse]: IncomingMessage;
 	declare [kResponseSize]?: number;
 	declare [kUnproxyEvents]: () => void;
+	declare [kCancelTimeouts]: () => void;
 	[kDownloadedSize]: number;
 	[kUploadedSize]: number;
 	[kBodySize]?: number;
@@ -514,18 +516,20 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				}
 
 				const initHooks = nonNormalizedOptions.hooks?.init;
-				if (initHooks && initHooks.length !== 0) {
+				const hasInitHooks = initHooks && initHooks.length !== 0;
+				if (hasInitHooks) {
 					nonNormalizedOptions.url = url;
 
-					for (const hook of initHooks) {
+					for (const hook of initHooks!) {
 						// eslint-disable-next-line no-await-in-loop
 						await hook(nonNormalizedOptions as Options & {url: string | URL});
 					}
 
+					url = nonNormalizedOptions.url;
 					nonNormalizedOptions.url = undefined;
 				}
 
-				if (kIsNormalizedAlready in nonNormalizedOptions) {
+				if (kIsNormalizedAlready in nonNormalizedOptions && !hasInitHooks) {
 					this.options = nonNormalizedOptions as NormalizedOptions;
 				} else {
 					// @ts-ignore Common TypeScript bug saying that `this.constructor` is not accessible
@@ -985,7 +989,9 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		if (options.followRedirect && response.headers.location && redirectCodes.has(statusCode)) {
 			response.resume(); // We're being redirected, we don't care about the response.
-			// TODO: Unattach timed-out
+			if (this[kCancelTimeouts]) {
+				this[kCancelTimeouts]();
+			}
 
 			// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
 			delete this[kRequest];
@@ -1207,7 +1213,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				timer(requestOrResponse);
 
 				if (timeout) {
-					timedOut(requestOrResponse, timeout, url);
+					this[kCancelTimeouts] = timedOut(requestOrResponse, timeout, url);
 				}
 
 				requestOrResponse.once('response', response => {

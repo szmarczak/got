@@ -105,12 +105,16 @@ test('catches afterResponse thrown errors', withServer, async (t, server, got) =
 	}), {message: errorString});
 });
 
-test('throws a helpful error when passing async function as init hook', async t => {
-	await t.throwsAsync(got('https://example.com', {
+test('accepts an async function as init hook', async t => {
+	await got('https://example.com', {
 		hooks: {
-			init: [async () => {}]
+			init: [
+				async () => {
+					t.pass();
+				}
+			]
 		}
-	}), {message: 'The `init` hook must be a synchronous function'});
+	});
 });
 
 test('catches beforeRequest promise rejections', async t => {
@@ -193,7 +197,6 @@ test('init is called with options', withServer, async (t, server, got) => {
 		hooks: {
 			init: [
 				options => {
-					t.is(options.url, undefined);
 					t.is(options.context, context);
 				}
 			]
@@ -211,7 +214,6 @@ test('init from defaults is called with options', withServer, async (t, server, 
 		hooks: {
 			init: [
 				options => {
-					t.is(options.url, undefined);
 					t.is(options.context, context);
 				}
 			]
@@ -659,7 +661,7 @@ test('beforeError allows modifications', async t => {
 				error => {
 					const newError = new Error(errorString2);
 
-					return new RequestError(errorString, newError, error.options);
+					return new RequestError(newError.message, newError, error.options);
 				}
 			]
 		}

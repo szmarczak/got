@@ -1,5 +1,4 @@
 import {URL} from 'url';
-import getStream = require('get-stream');
 import is, {assert} from '@sindresorhus/is';
 import {
 	Options,
@@ -122,19 +121,6 @@ export default class PromisableRequest extends Request {
 	async _beforeError(error: RequestError): Promise<void> {
 		const isHTTPError = error instanceof HTTPError;
 
-		if (this._throwHttpErrors) {
-			try {
-				const {response} = error;
-				const {encoding} = this.options;
-
-				if (response && is.undefined(response.body)) {
-					const body = await getStream.buffer(response);
-					response.body = body.toString(encoding);
-					response.body = parseBody(body, this.options.responseType, encoding);
-				}
-			} catch (_) {}
-		}
-
 		try {
 			for (const hook of this.options.hooks.beforeError) {
 				// eslint-disable-next-line no-await-in-loop
@@ -144,7 +130,7 @@ export default class PromisableRequest extends Request {
 			error = error_;
 		}
 
-		if (this._throwHttpErrors || !isHTTPError) {
+		if (this._throwHttpErrors && !isHTTPError) {
 			this.destroy(error);
 		} else {
 			this.emit('error', error);
