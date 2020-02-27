@@ -47,10 +47,6 @@ export interface Agents {
 	http2?: unknown;
 }
 
-export const isAgents = (value: any): value is Agents => {
-	return is.object(value) && ('http' in value || 'https' in value || 'http2' in value);
-};
-
 export const withoutBody: ReadonlySet<string> = new Set(['GET', 'HEAD']);
 
 export interface ToughCookieJar {
@@ -829,6 +825,14 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			throw new TypeError('The `followRedirects` option does not exist. Use `followRedirect` instead.');
 		}
 
+		if (options.agent) {
+			for (const key in options.agent) {
+				if (key !== 'http' && key !== 'https' && key !== 'http2') {
+					throw new TypeError(`Expected the \`options.agent\` properties to be \`http\`, \`https\` or \`http2\`, got ${key}`);
+				}
+			}
+		}
+
 		assert.any([is.boolean, is.undefined], options.decompress);
 		assert.any([is.boolean, is.undefined], options.ignoreInvalidCookies);
 		assert.any([is.string, is.undefined], options.encoding);
@@ -839,6 +843,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		assert.any([is.boolean, is.undefined], options.http2);
 		assert.any([is.boolean, is.undefined], options.allowGetBody);
 		assert.any([is.boolean, is.undefined], options.rejectUnauthorized);
+		assert.any([is.plainObject, is.undefined], options.agent);
 
 		options.decompress = Boolean(options.decompress);
 		options.ignoreInvalidCookies = Boolean(options.ignoreInvalidCookies);
@@ -1034,6 +1039,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				// Redirecting to a different site, clear cookies.
 				if (redirectUrl.hostname !== url.hostname && 'cookie' in options.headers) {
 					delete options.headers.cookie;
+					delete options.username;
+					delete options.password;
 				}
 
 				this.redirects.push(redirectString);
@@ -1117,6 +1124,70 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		this.emit('response', response);
 	}
 
+	_onRequest(request: ClientRequest) {
+		const {options} = this;
+		const {timeout, url} = options;
+
+		timer(request);
+
+		if (timeout) {
+			this[kCancelTimeouts] = timedOut(request, timeout, url);
+		}
+
+		request.once('response', response => {
+			this._onResponse(response);
+		});
+
+		request.once('error', (error: Error) => {
+			if (error instanceof TimedOutTimeoutError) {
+				error = new TimeoutError(error, this.timings!, options);
+			} else {
+				error = new RequestError(error.message, error, options, this);
+			}
+
+			this._beforeError(error as RequestError);
+		});
+
+		this[kUnproxyEvents] = proxyEvents(request, this, [
+			'socket',
+			'abort',
+			'connect',
+			'continue',
+			'information',
+			'upgrade',
+			'timeout'
+		]);
+
+		this[kRequest] = request;
+
+		this.emit('uploadProgress', this.uploadProgress);
+
+		// Send body
+		const currentRequest = this.redirects.length === 0 ? this : request;
+		if (is.nodeStream(options.body)) {
+			options.body.pipe(currentRequest);
+			options.body.once('error', (error: NodeJS.ErrnoException) => {
+				this._beforeError(new UploadError(error, options, this));
+			});
+
+			options.body.once('end', () => {
+				delete options.body;
+			});
+		} else {
+			this._unlockWrite();
+
+			if (options.body) {
+				this._writeRequest(options.body, null as unknown as string, () => {});
+			}
+
+			currentRequest.end();
+
+			this._lockWrite();
+		}
+
+		this.emit('request', request);
+	}
+
 	async makeRequest(): Promise<void> {
 		if (kRequest in this) {
 			return;
@@ -1189,7 +1260,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		const fn: RequestFunction<unknown> = options.cacheableRequest ? cacheFn : realFn;
 
-		if (isAgents(agent) && !options.http2) {
+		if (agent && !options.http2) {
 			(options as unknown as RequestOptions).agent = agent[isHttps ? 'https' : 'http'];
 		}
 
@@ -1211,69 +1282,13 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			options.agent = agent;
 
 			if (isClientRequest(requestOrResponse)) {
-				timer(requestOrResponse);
-
-				if (timeout) {
-					this[kCancelTimeouts] = timedOut(requestOrResponse, timeout, url);
-				}
-
-				requestOrResponse.once('response', response => {
-					this._onResponse(response);
-				});
-
-				requestOrResponse.once('error', (error: Error) => {
-					if (error instanceof TimedOutTimeoutError) {
-						error = new TimeoutError(error, this.timings!, options);
-					} else {
-						error = new RequestError(error.message, error, options, this);
-					}
-
-					this._beforeError(error as RequestError);
-				});
-
-				this[kUnproxyEvents] = proxyEvents(requestOrResponse, this, [
-					'socket',
-					'abort',
-					'connect',
-					'continue',
-					'information',
-					'upgrade',
-					'timeout'
-				]);
-
-				this[kRequest] = requestOrResponse;
-
-				// Send body
-				const currentRequest = this.redirects.length === 0 ? this : requestOrResponse;
-				if (is.nodeStream(options.body)) {
-					options.body.pipe(currentRequest);
-					options.body.once('error', (error: NodeJS.ErrnoException) => {
-						this._beforeError(new UploadError(error, options, this));
-					});
-
-					options.body.once('end', () => {
-						delete options.body;
-					});
-				} else {
-					this._unlockWrite();
-
-					if (options.body) {
-						this._writeRequest(options.body, null as unknown as string, () => {});
-					}
-
-					currentRequest.end();
-
-					this._lockWrite();
-				}
-
-				this.emit('request', requestOrResponse);
+				this._onRequest(requestOrResponse);
 			} else if (is.undefined(requestOrResponse)) {
 				// Fallback to http(s).request
 				throw new Error('Fallback to `http.request` not implemented yet');
 			} else {
 				// TODO: Rewrite `cacheable-request`
-				// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-				this._onResponse(requestOrResponse as unknown as IncomingMessage);
+				this._onResponse(requestOrResponse as IncomingMessage);
 			}
 		} catch (error) {
 			if (error instanceof RequestError) {
@@ -1427,10 +1442,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 	get timings(): Timings | undefined {
 		return (this[kRequest] as ClientRequestWithTimings)?.timings;
-	}
-
-	get flushedHeaders(): boolean {
-		return Boolean(this[kRequest]);
 	}
 
 	get isFromCache(): boolean | undefined {

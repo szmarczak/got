@@ -108,12 +108,14 @@ test('download progress - stream', withServer, async (t, server, got) => {
 	checkEvents(t, events, file.length);
 });
 
-test('upload progress - file', withServer, async (t, server, got) => {
+test.only('upload progress - file', withServer, async (t, server, got) => {
 	server.post('/', uploadEndpoint);
 
 	const events: Progress[] = [];
 
 	await got.post({body: file}).on('uploadProgress', (event: Progress) => events.push(event));
+
+	console.log(events);
 
 	checkEvents(t, events, file.length);
 });
