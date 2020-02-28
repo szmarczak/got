@@ -457,7 +457,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	[kResponse]?: IncomingMessage;
 	[kRequest]?: ClientRequest;
 	_noPipe?: boolean;
-	_writeCounter: number;
+	_progressCallbacks: Array<() => void>;
 
 	declare options: NormalizedOptions;
 	declare requestUrl: string;
@@ -477,7 +477,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		this.redirects = [];
 
 		// TODO: Remove this when targeting Node.js >= 12
-		this._writeCounter = 0;
+		this._progressCallbacks = [];
 
 		const unlockWrite = (): void => this._unlockWrite();
 		const lockWrite = (): void => this._lockWrite();
@@ -1331,20 +1331,19 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	}
 
 	_writeRequest(chunk: any, encoding: string, callback: (error?: Error | null) => void): void {
-		this._writeCounter++;
+		this._progressCallbacks.push((): void => {
+			this[kUploadedSize] += Buffer.byteLength(chunk, encoding as BufferEncoding);
+
+			const progress = this.uploadProgress;
+
+			if (progress.percent < 1) {
+				this.emit('uploadProgress', progress);
+			}
+		});
 
 		this[kRequest]!.write(chunk, encoding, (error?: Error | null) => {
-			this._writeCounter--;
-			this.emit('_counterUpdate');
-
-			if (!error) {
-				this[kUploadedSize] += Buffer.byteLength(chunk, encoding as BufferEncoding);
-
-				const progress = this.uploadProgress;
-
-				if (progress.percent < 1) {
-					this.emit('uploadProgress', progress);
-				}
+			if (!error && this._progressCallbacks.length !== 0) {
+				this._progressCallbacks.shift()!();
 			}
 
 			callback(error);
@@ -1354,10 +1353,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	_final(callback: (error?: Error | null) => void): void {
 		const endRequest = (): void => {
 			// FIX: Node.js 10 calls the write callback AFTER the end callback!
-			// Make sure that the `finish` event is emitted after all the writes are done.
-			if (this._writeCounter !== 0) {
-				this.on('_counterUpdate', endRequest);
-				return;
+			while (this._progressCallbacks.length !== 0) {
+				this._progressCallbacks.shift()!();
 			}
 
 			// We need to check if `this[kRequest]` is present,
