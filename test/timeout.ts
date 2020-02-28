@@ -510,8 +510,7 @@ test.serial('socket timeout is canceled on error', withServerAndLolex, async (t,
 		timeout: {socket: 50},
 		retry: 0
 	}).on('request', (request: http.ClientRequest) => {
-		request.abort();
-		request.emit('error', new Error(message));
+		request.destroy(new Error(message));
 	});
 
 	await t.throwsAsync(promise, {message});
