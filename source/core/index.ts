@@ -756,8 +756,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		// `options.timeout`
 		if (is.number(options.timeout)) {
 			options.timeout = {request: options.timeout};
-		} else if (is.undefined(options.timeout)) {
-			options.timeout = {};
 		} else if (is.object(options.timeout)) {
 			options.timeout = {...options.timeout};
 		} else {
@@ -971,7 +969,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		typedResponse.redirectUrls = this.redirects;
 		typedResponse.request = this;
 		typedResponse.isFromCache = (response as any).fromCache || false;
-		typedResponse.ip = typedResponse.isFromCache ? undefined : response.socket.remoteAddress;
+		typedResponse.ip = this.ip;
 
 		this[kIsFromCache] = typedResponse.isFromCache;
 
@@ -1411,8 +1409,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		callback(error);
 	}
 
-	get socket(): Socket | undefined {
-		return this[kRequest]?.socket;
+	get ip(): string | undefined {
+		return this[kRequest]?.socket.remoteAddress;
 	}
 
 	get aborted(): boolean {

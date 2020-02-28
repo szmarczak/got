@@ -41,11 +41,6 @@ export default class PromisableRequest extends Request {
 	static normalizeArguments(url?: string | URL, nonNormalizedOptions?: Options, defaults?: Defaults): NormalizedOptions {
 		const options = super.normalizeArguments(url, nonNormalizedOptions, defaults) as NormalizedOptions;
 
-		if (!('responseType' in options)) {
-			// @ts-ignore TypeScript bug - it says `options` is `never`
-			options.responseType = 'text';
-		}
-
 		assert.any([is.boolean, is.undefined], options.resolveBodyOnly);
 		assert.any([is.boolean, is.undefined], options.methodRewriting);
 		assert.any([is.boolean, is.undefined], options.isStream);
@@ -111,8 +106,6 @@ export default class PromisableRequest extends Request {
 			if (!is.function_(pagination.paginate)) {
 				throw new Error('`options._pagination.paginate` must be implemented');
 			}
-		} else if (is.undefined(options._pagination)) {
-			options._pagination = defaults?._pagination;
 		}
 
 		return options;

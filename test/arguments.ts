@@ -344,3 +344,24 @@ test('`url` option and input argument are mutually exclusive', async t => {
 		url: 'https://example.com'
 	}), {message: 'The `url` option is mutually exclusive with the `input` argument'});
 });
+
+test('throws a helpful error when passing `followRedirects`', async t => {
+	await t.throwsAsync(got('https://example.com', {
+		// @ts-ignore For testing purposes
+		followRedirects: true
+	}), {message: 'The `followRedirects` option does not exist. Use `followRedirect` instead.'});
+});
+
+test('throws on invalid `timeout` option', async t => {
+	// @ts-ignore For testing purposes
+	await t.throwsAsync(got('https://example.com', {
+		timeout: 'asdf'
+	}), {message: 'Parameter `timeout` must be an object or a number, not string'});
+});
+
+test('throws on invalid `dnsCache` option', async t => {
+	// @ts-ignore For testing purposes
+	await t.throwsAsync(got('https://example.com', {
+		dnsCache: 'asdf'
+	}), {message: 'Parameter `dnsCache` must be a CacheableLookup instance or a boolean, not string'});
+});
