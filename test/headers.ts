@@ -183,9 +183,9 @@ test('buffer as `options.body` sets `content-length` header', withServer, async 
 });
 
 test('throws on null value headers', async t => {
-	// @ts-ignore Error tests
 	await t.throwsAsync(got({
 		url: 'https://example.com',
+		// @ts-ignore Testing purposes
 		headers: {
 			'user-agent': null
 		}

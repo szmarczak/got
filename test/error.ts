@@ -183,7 +183,7 @@ test('errors are thrown directly when options.stream is true', t => {
 		// @ts-ignore Error tests
 		got('https://example.com', {isStream: true, hooks: false});
 	}, {
-		message: 'Parameter `hooks` must be an Object, not boolean'
+		message: 'Parameter `hooks` must be an Object, got boolean'
 	});
 });
 

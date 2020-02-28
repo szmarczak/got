@@ -98,28 +98,28 @@ export interface GotRequest {
 	<T>(url: string | URL, options?: OptionsOfJSONResponseBody): CancelableRequest<Response<T>>;
 	(url: string | URL, options?: OptionsOfBufferResponseBody): CancelableRequest<Response<Buffer>>;
 
-	(options?: OptionsOfTextResponseBody): CancelableRequest<Response<string>>;
-	<T>(options?: OptionsOfJSONResponseBody): CancelableRequest<Response<T>>;
-	(options?: OptionsOfBufferResponseBody): CancelableRequest<Response<Buffer>>;
+	(options: OptionsOfTextResponseBody): CancelableRequest<Response<string>>;
+	<T>(options: OptionsOfJSONResponseBody): CancelableRequest<Response<T>>;
+	(options: OptionsOfBufferResponseBody): CancelableRequest<Response<Buffer>>;
 
 	// `resolveBodyOnly` usage
 	(url: string | URL, options?: (OptionsOfTextResponseBody & ResponseBodyOnly)): CancelableRequest<string>;
 	<T>(url: string | URL, options?: (OptionsOfJSONResponseBody & ResponseBodyOnly)): CancelableRequest<T>;
 	(url: string | URL, options?: (OptionsOfBufferResponseBody & ResponseBodyOnly)): CancelableRequest<Buffer>;
 
-	(options?: (OptionsOfTextResponseBody & ResponseBodyOnly)): CancelableRequest<string>;
-	<T>(options?: (OptionsOfJSONResponseBody & ResponseBodyOnly)): CancelableRequest<T>;
-	(options?: (OptionsOfBufferResponseBody & ResponseBodyOnly)): CancelableRequest<Buffer>;
+	(options: (OptionsOfTextResponseBody & ResponseBodyOnly)): CancelableRequest<string>;
+	<T>(options: (OptionsOfJSONResponseBody & ResponseBodyOnly)): CancelableRequest<T>;
+	(options: (OptionsOfBufferResponseBody & ResponseBodyOnly)): CancelableRequest<Buffer>;
 
 	// `asStream` usage
 	(url: string | URL, options?: Options & {isStream: true}): Request;
 
-	(options?: Options & {isStream: true}): Request;
+	(options: Options & {isStream: true}): Request;
 
 	// Fallback
 	(url: string | URL, options?: Options): CancelableRequest | Request;
 
-	(options?: Options): CancelableRequest | Request;
+	(options: Options): CancelableRequest | Request;
 }
 
 export type GotStream = GotStreamFunction & Record<HTTPAlias, GotStreamFunction>;

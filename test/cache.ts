@@ -136,6 +136,18 @@ test('doesn\'t cache response when received HTTP error', withServer, async (t, s
 });
 
 test('DNS cache works', withServer, async (t, _server, got) => {
+	const instance = got.extend({
+		dnsCache: true,
+		prefixUrl: ''
+	});
+
+	await t.notThrowsAsync(instance('https://example.com'));
+
+	// @ts-ignore
+	t.is(instance.defaults.options.dnsCache!._cache.size, 1);
+});
+
+test('DNS cache works - CacheableLookup instance', withServer, async (t, _server, got) => {
 	const cache = new CacheableLookup();
 	await t.notThrowsAsync(got('https://example.com', {dnsCache: cache, prefixUrl: ''}));
 

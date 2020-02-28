@@ -596,7 +596,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			'host' in options ||
 			'port' in options ||
 			'search' in options ||
-			'protocol' in options
+			'protocol' in options ||
+			'auth' in options
 		) {
 			throw new TypeError('The legacy `url.Url` has been deprecated. Use `URL` instead.');
 		}
@@ -607,7 +608,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		} else if (is.undefined(options.method)) {
 			options.method = 'GET';
 		} else {
-			throw new TypeError(`Parameter \`method\` must be a string, not ${is(options.method)}`);
+			throw new TypeError(`Parameter \`method\` must be a string, got ${is(options.method)}`);
 		}
 
 		// `options.headers`
@@ -616,7 +617,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		} else if (is.object(options.headers)) {
 			options.headers = lowercaseKeys({...(defaults?.headers), ...options.headers});
 		} else {
-			throw new TypeError(`Parameter \`headers\` must be an object, not ${is(options.headers)}`);
+			throw new TypeError(`Parameter \`headers\` must be an object, got ${is(options.headers)}`);
 		}
 
 		// `options.prefixUrl` & `options.url`
@@ -626,25 +627,23 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			if (options.prefixUrl !== '' && !options.prefixUrl.endsWith('/')) {
 				options.prefixUrl += '/';
 			}
+		} else {
+			throw new TypeError(`Parameter \`prefixUrl\` must be a string or a URL instance, got ${is(options.prefixUrl)}`);
+		}
 
-			if (is.string(options.url)) {
-				if (options.url.startsWith('/')) {
-					throw new Error('`input` must not begin with a slash when using `prefixUrl`');
-				}
-
-				options.url = new URL(options.prefixUrl + options.url);
-			} else if (is.undefined(options.url) && options.prefixUrl !== '') {
-				options.url = new URL(options.prefixUrl);
+		if (is.string(options.url)) {
+			if (options.url.startsWith('/')) {
+				throw new Error('`input` must not start with a slash when using `prefixUrl`');
 			}
-		} else if (!is.undefined(options.prefixUrl)) {
-			throw new TypeError(`Parameter \`prefixUrl\` must be a string, not ${is(options.prefixUrl)}`);
-		} else if (is.string(options.url)) {
-			options.url = new URL(options.url);
+
+			options.url = new URL(options.prefixUrl + options.url);
+		} else if (is.undefined(options.url) && options.prefixUrl !== '') {
+			options.url = new URL(options.prefixUrl);
 		}
 
 		if (options.url) {
 			// Make it possible to change `options.prefixUrl`
-			let prefixUrl = options.prefixUrl as string;
+			let {prefixUrl} = options;
 			Object.defineProperty(options, 'prefixUrl', {
 				set: (value: string) => {
 					const url = options!.url as URL;
@@ -675,10 +674,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		// `options.username` & `options.password`
 		if (options.username || options.password) {
-			if ('auth' in options) {
-				throw new TypeError('Parameter `auth` is mutually exclusive with the `username` and `password` option');
-			}
-
 			options.url!.username = options.username ?? '';
 			options.url!.password = options.password ?? '';
 		}
@@ -705,7 +700,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 			options.cookieJar = {setCookie, getCookieString};
 		} else if (!is.undefined(options.cookieJar)) {
-			throw new TypeError(`Parameter \`cookieJar\` must be an object, not ${is(options.cookieJar)}`);
+			throw new TypeError(`Parameter \`cookieJar\` must be an object, got ${is(options.cookieJar)}`);
 		}
 
 		// `options.searchParams`
@@ -728,7 +723,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				options.url.search = options.searchParams.toString();
 			}
 		} else if (!is.undefined(options.searchParams)) {
-			throw new TypeError(`Parameter \`searchParams\` must be an object or a string, not ${is(options.searchParams)}`);
+			throw new TypeError(`Parameter \`searchParams\` must be an object or a string, got ${is(options.searchParams)}`);
 		}
 
 		// `options.cache`
@@ -743,14 +738,14 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				options.cache
 			);
 		} else if (!is.undefined(options.cache)) {
-			throw new TypeError(`Parameter \`cache\` must be an object, not ${is(options.cache)}`);
+			throw new TypeError(`Parameter \`cache\` must be an object, got ${is(options.cache)}`);
 		}
 
 		// `options.dnsCache`
 		if (options.dnsCache === true) {
 			options.dnsCache = new CacheableLookup();
 		} else if (!is.undefined(options.dnsCache) && options.dnsCache !== false && !(options.dnsCache instanceof CacheableLookup)) {
-			throw new TypeError(`Parameter \`dnsCache\` must be a CacheableLookup instance or a boolean, not ${is(options.dnsCache)}`);
+			throw new TypeError(`Parameter \`dnsCache\` must be a CacheableLookup instance or a boolean, got ${is(options.dnsCache)}`);
 		}
 
 		// `options.timeout`
@@ -759,7 +754,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		} else if (is.object(options.timeout)) {
 			options.timeout = {...options.timeout};
 		} else {
-			throw new TypeError(`Parameter \`timeout\` must be an object or a number, not ${is(options.timeout)}`);
+			throw new TypeError(`Parameter \`timeout\` must be an object or a number, got ${is(options.timeout)}`);
 		}
 
 		if (defaults) {
@@ -775,7 +770,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				options.context = {};
 			}
 		} else if (!is.object(options.context)) {
-			throw new TypeError(`Parameter \`context\` must be an object, not ${is('options.context')}`);
+			throw new TypeError(`Parameter \`context\` must be an object, got ${is('options.context')}`);
 		}
 
 		// `options.hooks`
@@ -788,14 +783,14 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 						// See https://github.com/microsoft/TypeScript/issues/31445#issuecomment-576929044
 						(options.hooks as any)[event] = [...options.hooks[event]!];
 					} else {
-						throw new TypeError(`Parameter \`${event}\` must be an Array, not ${is(options.hooks[event])}`);
+						throw new TypeError(`Parameter \`${event}\` must be an Array, got ${is(options.hooks[event])}`);
 					}
 				} else {
 					options.hooks[event] = [];
 				}
 			}
 		} else {
-			throw new TypeError(`Parameter \`hooks\` must be an Object, not ${is(options.hooks)}`);
+			throw new TypeError(`Parameter \`hooks\` must be an Object, got ${is(options.hooks)}`);
 		}
 
 		if (defaults?.hooks) {

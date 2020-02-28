@@ -12,10 +12,18 @@ const echoUrl: Handler = (request, response) => {
 
 test('`url` is required', async t => {
 	await t.throwsAsync(
-		// @ts-ignore Error tests
 		got(''),
 		{
 			message: 'Missing `url` property'
+		}
+	);
+
+	await t.throwsAsync(
+		got({
+			url: ''
+		}),
+		{
+			message: 'Invalid URL: '
 		}
 	);
 });
@@ -179,7 +187,7 @@ test('throws TypeError when `options.hooks` is not an object', async t => {
 		// @ts-ignore Error tests
 		got('https://example.com', {hooks: 'not object'}),
 		{
-			message: 'Parameter `hooks` must be an Object, not string'
+			message: 'Parameter `hooks` must be an Object, got string'
 		}
 	);
 });
@@ -189,7 +197,7 @@ test('throws TypeError when known `options.hooks` value is not an array', async 
 		// @ts-ignore Error tests
 		got('https://example.com', {hooks: {beforeRequest: {}}}),
 		{
-			message: 'Parameter `beforeRequest` must be an Array, not Object'
+			message: 'Parameter `beforeRequest` must be an Array, got Object'
 		}
 	);
 });
@@ -356,12 +364,66 @@ test('throws on invalid `timeout` option', async t => {
 	// @ts-ignore For testing purposes
 	await t.throwsAsync(got('https://example.com', {
 		timeout: 'asdf'
-	}), {message: 'Parameter `timeout` must be an object or a number, not string'});
+	}), {message: 'Parameter `timeout` must be an object or a number, got string'});
 });
 
 test('throws on invalid `dnsCache` option', async t => {
 	// @ts-ignore For testing purposes
 	await t.throwsAsync(got('https://example.com', {
 		dnsCache: 'asdf'
-	}), {message: 'Parameter `dnsCache` must be a CacheableLookup instance or a boolean, not string'});
+	}), {message: 'Parameter `dnsCache` must be a CacheableLookup instance or a boolean, got string'});
+});
+
+test('throws on invalid `cache` option', async t => {
+	// @ts-ignore For testing purposes
+	await t.throwsAsync(got('https://example.com', {
+		cache: 3
+	}), {message: 'Parameter `cache` must be an object, got number'});
+});
+
+test('throws on invalid `searchParams` option', async t => {
+	// @ts-ignore For testing purposes
+	await t.throwsAsync(got('https://example.com', {
+		searchParams: 3
+	}), {message: 'Parameter `searchParams` must be an object or a string, got number'});
+});
+
+test('throws on invalid `cookieJar` option', async t => {
+	// @ts-ignore For testing purposes
+	await t.throwsAsync(got('https://example.com', {
+		cookieJar: 3
+	}), {message: 'Parameter `cookieJar` must be an object, got number'});
+});
+
+test('merges `searchParams` instances', t => {
+	const instance = got.extend({
+		searchParams: new URLSearchParams('a=1')
+	}, {
+		searchParams: new URLSearchParams('b=2')
+	});
+
+	t.is(instance.defaults.options.searchParams!.get('a'), '1');
+	t.is(instance.defaults.options.searchParams!.get('b'), '2');
+});
+
+test('throws a helpful error when passing `auth`', async t => {
+	await t.throwsAsync(got('https://example.com', {
+		// @ts-ignore For testing purposes
+		auth: 'username:password'
+	}), {
+		message: 'The legacy `url.Url` has been deprecated. Use `URL` instead.'
+	});
+});
+
+test('throws when input starts with a slash and the `prefixUrl` option is present', async t => {
+	await t.throwsAsync(got('/asdf', {prefixUrl: 'https://example.com'}), {
+		message: '`input` must not start with a slash when using `prefixUrl`'
+	});
+});
+
+test('throws on invalid `prefixUrl` option', async t => {
+	// @ts-ignore For testing purposes
+	await t.throwsAsync(got('https://example.com', {
+		prefixUrl: 3
+	}), {message: 'Parameter `prefixUrl` must be a string or a URL instance, got number'});
 });

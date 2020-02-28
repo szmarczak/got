@@ -582,7 +582,6 @@ test('throwing in a beforeError hook - promise', withServer, async (t, server, g
 		response.end('ok');
 	});
 
-	// @ts-ignore Error tests
 	await t.throwsAsync(got({
 		hooks: {
 			afterResponse: [
@@ -591,11 +590,11 @@ test('throwing in a beforeError hook - promise', withServer, async (t, server, g
 				}
 			],
 			beforeError: [
-				() => {
+				(): never => {
 					throw new Error('foobar');
 				},
 				() => {
-					t.fail('This shouldn\'t be called at all');
+					throw new Error('This shouldn\'t be called at all');
 				}
 			]
 		}
@@ -603,7 +602,6 @@ test('throwing in a beforeError hook - promise', withServer, async (t, server, g
 });
 
 test('throwing in a beforeError hook - stream', withServer, async (t, _server, got) => {
-	// @ts-ignore Error tests
 	await t.throwsAsync(getStream(got.stream({
 		hooks: {
 			beforeError: [
@@ -611,7 +609,7 @@ test('throwing in a beforeError hook - stream', withServer, async (t, _server, g
 					throw new Error('foobar');
 				},
 				() => {
-					t.fail('This shouldn\'t be called at all');
+					throw new Error('This shouldn\'t be called at all');
 				}
 			]
 		}
