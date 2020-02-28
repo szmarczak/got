@@ -136,6 +136,12 @@ test('can set defaults to `got.mergeOptions(...)`', t => {
 	});
 
 	t.true(instance.defaults.options.followRedirect);
+
+	t.notThrows(() => {
+		instance.defaults.options = got.mergeOptions({});
+	});
+
+	t.false(instance.defaults.options.followRedirect);
 });
 
 test('can set mutable defaults using got.extend', t => {

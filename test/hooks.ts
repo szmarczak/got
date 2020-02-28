@@ -3,6 +3,7 @@ import test from 'ava';
 import getStream from 'get-stream';
 import delay = require('delay');
 import {Handler} from 'express';
+import Responselike = require('responselike');
 import got, {RequestError} from '../source';
 import withServer from './helpers/with-server';
 
@@ -11,6 +12,10 @@ const error = new Error(errorString);
 
 const echoHeaders: Handler = (request, response) => {
 	response.end(JSON.stringify(request.headers));
+};
+
+const echoUrl: Handler = (request, response) => {
+	response.end(request.url);
 };
 
 const retryEndpoint: Handler = (request, response) => {
@@ -272,6 +277,29 @@ test('beforeRequest allows modifications', withServer, async (t, server, got) =>
 		}
 	});
 	t.is(body.foo, 'bar');
+});
+
+test('returning HTTP response from a beforeRequest hook', withServer, async (t, server, got) => {
+	server.get('/', echoUrl);
+
+	const {statusCode, headers, body} = await got({
+		hooks: {
+			beforeRequest: [
+				() => {
+					return new Responselike(
+						200,
+						{foo: 'bar'},
+						Buffer.from('Hi!'),
+						''
+					);
+				}
+			]
+		}
+	});
+
+	t.is(statusCode, 200);
+	t.is(headers.foo, 'bar');
+	t.is(body, 'Hi!');
 });
 
 test('beforeRedirect is called with options and response', withServer, async (t, server, got) => {

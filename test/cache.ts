@@ -82,11 +82,16 @@ test('redirects are cached and re-used internally', withServer, async (t, server
 	server.get('/', cacheEndpoint);
 
 	const cache = new Map();
-	const firstResponse = await got('301', {cache});
-	const secondResponse = await got('302', {cache});
+	const A1 = await got('301', {cache});
+	const B1 = await got('302', {cache});
+
+	const A2 = await got('301', {cache});
+	const B2 = await got('302', {cache});
 
 	t.is(cache.size, 3);
-	t.is(firstResponse.body, secondResponse.body);
+	t.is(A1.body, B1.body);
+	t.is(A1.body, A2.body);
+	t.is(B1.body, B2.body);
 });
 
 test('cached response has got options', withServer, async (t, server, got) => {

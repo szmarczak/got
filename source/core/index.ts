@@ -97,7 +97,10 @@ export type HookEvent = 'init' | 'beforeRequest' | 'beforeRedirect' | 'beforeErr
 
 export const knownHookEvents: HookEvent[] = ['init', 'beforeRequest', 'beforeRedirect', 'beforeError'];
 
-export type RequestFunction<T = IncomingMessage | ResponseLike> = (url: URL, options: RequestOptions, callback?: (response: T) => void) => ClientRequest | T | Promise<ClientRequest> | Promise<T> | undefined;
+type AcceptableResponse = IncomingMessage | ResponseLike;
+type AcceptableRequestResult = AcceptableResponse | ClientRequest | Promise<AcceptableResponse | ClientRequest> | undefined;
+
+export type RequestFunction = (url: URL, options: RequestOptions, callback?: (response: AcceptableResponse) => void) => AcceptableRequestResult;
 
 export type Headers = Record<string, string | string[] | undefined>;
 
@@ -160,6 +163,8 @@ export interface NormalizedOptions extends Options {
 	rejectUnauthorized: boolean;
 	lookup?: CacheableLookup['lookup'];
 	methodRewriting: boolean;
+	username: string;
+	password: string;
 	[kRequest]: HttpRequestFunction;
 	[kIsNormalizedAlready]?: boolean;
 }
@@ -458,7 +463,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 	finalized: boolean;
 	redirects: string[];
 
-	constructor(url: string | URL, options?: Options, defaults?: Defaults) {
+	constructor(url: string | URL, options: Options = {}, defaults?: Defaults) {
 		super({
 			// It needs to be zero because we're just proxying the data to another stream
 			highWaterMark: 0
@@ -469,10 +474,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		this.finalized = false;
 		this[kServerResponsesPiped] = new Set<ServerResponse>();
 		this.redirects = [];
-
-		if (!options) {
-			options = {};
-		}
 
 		const unlockWrite = (): void => this._unlockWrite();
 		const lockWrite = (): void => this._lockWrite();
@@ -545,8 +546,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				this.requestUrl = options.url.toString();
 				decodeURI(this.requestUrl);
 
-				await this.finalizeBody();
-				await this.makeRequest();
+				await this._finalizeBody();
+				await this._makeRequest();
 
 				this.finalized = true;
 				this.emit('finalized');
@@ -620,13 +621,11 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		assert.any([is.boolean, is.undefined], options.ignoreInvalidCookies);
 		assert.any([is.string, is.undefined], options.encoding);
 		assert.any([is.boolean, is.undefined], options.followRedirect);
-		assert.any([is.string, is.undefined], options.encoding);
 		assert.any([is.number, is.undefined], options.maxRedirects);
 		assert.any([is.boolean, is.undefined], options.throwHttpErrors);
 		assert.any([is.boolean, is.undefined], options.http2);
 		assert.any([is.boolean, is.undefined], options.allowGetBody);
 		assert.any([is.boolean, is.undefined], options.rejectUnauthorized);
-		assert.any([is.plainObject, is.boolean, is.undefined], options.agent);
 
 		// `options.method`
 		if (is.string(options.method)) {
@@ -695,9 +694,12 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 
 		// `options.username` & `options.password`
-		if (options.username || options.password) {
-			options.url!.username = options.username ?? '';
-			options.url!.password = options.password ?? '';
+		options.username = options.username ?? '';
+		options.password = options.password ?? '';
+
+		if (options.url) {
+			options.url.username = options.username;
+			options.url.password = options.password;
 		}
 
 		// `options.cookieJar`
@@ -706,10 +708,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 			// Horrible `tough-cookie` check
 			if (setCookie.length === 4 && getCookieString.length === 0) {
-				if (!(promisify.custom in setCookie)) {
-					setCookie = promisify(setCookie.bind(options.cookieJar));
-					getCookieString = promisify(getCookieString.bind(options.cookieJar));
-				}
+				setCookie = promisify(setCookie.bind(options.cookieJar));
+				getCookieString = promisify(getCookieString.bind(options.cookieJar));
 			} else if (setCookie.length !== 2) {
 				throw new TypeError('`options.cookieJar.setCookie` needs to be an async function with 2 arguments');
 			} else if (getCookieString.length !== 1) {
@@ -791,15 +791,13 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			}
 		}
 
-		if (defaults?.hooks) {
+		if (defaults) {
 			for (const event of knownHookEvents) {
-				if (!(event in options.hooks && is.undefined(options.hooks[event]))) {
-					// See https://github.com/microsoft/TypeScript/issues/31445#issuecomment-576929044
-					(options.hooks as any)[event] = [
-						...defaults.hooks[event],
-						...options.hooks[event]!
-					];
-				}
+				// See https://github.com/microsoft/TypeScript/issues/31445#issuecomment-576929044
+				(options.hooks as any)[event] = [
+					...defaults.hooks[event],
+					...options.hooks[event]!
+				];
 			}
 		}
 
@@ -845,7 +843,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		this.end = super.end;
 	}
 
-	async finalizeBody(): Promise<void> {
+	async _finalizeBody(): Promise<void> {
 		const {options} = this;
 		const {headers} = options;
 
@@ -895,7 +893,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 					}
 
 					options.body = (new URLSearchParams(options.form as Record<string, string>)).toString();
-				} else if (isJSON) {
+				} else {
 					if (noContentType) {
 						headers['content-type'] = 'application/json';
 					}
@@ -967,14 +965,18 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 
 		if (options.followRedirect && response.headers.location && redirectCodes.has(statusCode)) {
-			response.resume(); // We're being redirected, we don't care about the response.
-			if (this[kCancelTimeouts]) {
-				this[kCancelTimeouts]!();
-			}
+			// We're being redirected, we don't care about the response.
+			// It'd be besto to abort the request, but we can't because
+			// we would have to sacrifice the TCP connection. We don't want that.
+			response.resume();
 
-			// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-			delete this[kRequest];
-			this[kUnproxyEvents]();
+			if (this[kRequest]) {
+				this[kCancelTimeouts]!();
+
+				// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+				delete this[kRequest];
+				this[kUnproxyEvents]();
+			}
 
 			const shouldBeGet = statusCode === 303 && options.method !== 'GET' && options.method !== 'HEAD';
 			if (shouldBeGet || !options.methodRewriting) {
@@ -1024,7 +1026,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 				this.emit('redirect', typedResponse, options);
 
-				await this.makeRequest();
+				await this._makeRequest();
 			} catch (error) {
 				this._beforeError(error);
 				return;
@@ -1100,9 +1102,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		timer(request);
 
-		if (timeout) {
-			this[kCancelTimeouts] = timedOut(request, timeout, url);
-		}
+		this[kCancelTimeouts] = timedOut(request, timeout, url);
 
 		request.once('response', response => {
 			this._onResponse(response);
@@ -1161,11 +1161,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		this.emit('request', request);
 	}
 
-	async makeRequest(): Promise<void> {
-		if (kRequest in this) {
-			return;
-		}
-
+	async _makeRequest(): Promise<void> {
 		const {options} = this;
 		const {url, headers, request, agent, timeout} = options;
 
@@ -1195,7 +1191,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			// eslint-disable-next-line no-await-in-loop
 			const result = await hook(options);
 
-			if (result instanceof ClientRequest) {
+			if (!is.undefined(result)) {
+				// @ts-ignore Skip the type mismatch to support abstract responses
 				options.request = () => result;
 				break;
 			}
@@ -1222,16 +1219,15 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		const isHttps = url.protocol === 'https:';
 
-		let realFn: RequestFunction<unknown> = options.request!;
-		if (!realFn) {
-			if (options.http2) {
-				realFn = http2wrapper.auto;
-			} else {
-				realFn = isHttps ? https.request : http.request;
-			}
+		let fallbackFn: HttpRequestFunction;
+		if (options.http2) {
+			fallbackFn = http2wrapper.auto;
+		} else {
+			fallbackFn = isHttps ? https.request : http.request;
 		}
 
-		const fn: RequestFunction<unknown> = options.cacheableRequest ? cacheFn : realFn;
+		const realFn = options.request ?? fallbackFn;
+		const fn = options.cacheableRequest ? cacheFn : realFn;
 
 		if (agent && !options.http2) {
 			(options as unknown as RequestOptions).agent = agent[isHttps ? 'https' : 'http'];
@@ -1239,15 +1235,16 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		options[kRequest] = realFn as HttpRequestFunction;
 		delete options.request;
+		delete options.timeout;
 
-		if (timeout) {
-			delete options.timeout;
-		}
-
-		let requestOrResponse;
+		let requestOrResponse: ReturnType<RequestFunction>;
 
 		try {
 			requestOrResponse = await fn(url, options as unknown as RequestOptions);
+
+			if (is.undefined(requestOrResponse)) {
+				requestOrResponse = fallbackFn(url, options as unknown as RequestOptions);
+			}
 
 			// Restore options
 			options.request = request;
@@ -1256,12 +1253,18 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 			if (isClientRequest(requestOrResponse)) {
 				this._onRequest(requestOrResponse);
-			} else if (is.undefined(requestOrResponse)) {
-				// Fallback to http(s).request
-				throw new Error('Fallback to `http.request` not implemented yet');
-			} else {
-				// TODO: Rewrite `cacheable-request`
+
+				// Emit the response after the stream has been ended
+			} else if (this.writableFinished) {
 				this._onResponse(requestOrResponse as IncomingMessage);
+			} else {
+				this.once('finish', () => {
+					this._onResponse(requestOrResponse as IncomingMessage);
+				});
+
+				this._unlockWrite();
+				this.end();
+				this._lockWrite();
 			}
 		} catch (error) {
 			if (error instanceof RequestError) {
@@ -1313,9 +1316,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 	_write(chunk: any, encoding: string, callback: (error?: Error | null) => void): void {
 		const write = (): void => {
-			if (kRequest in this) {
-				this._writeRequest(chunk, encoding, callback);
-			}
+			this._writeRequest(chunk, encoding, callback);
 		};
 
 		if (this.finalized) {
@@ -1346,6 +1347,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			// We need to check if `this[kRequest]` is present,
 			// because it isn't when we use cache.
 			if (!(kRequest in this)) {
+				callback();
 				return;
 			}
 

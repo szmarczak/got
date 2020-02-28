@@ -385,3 +385,27 @@ test('throws when input starts with a slash and the `prefixUrl` option is presen
 		message: '`input` must not start with a slash when using `prefixUrl`'
 	});
 });
+
+test('throws on invalid `dnsCache` option', async t => {
+	// @ts-ignore Error tests
+	await t.throwsAsync(got('https://example.com', {
+		dnsCache: 123
+	}), {message: 'Parameter `dnsCache` must be a CacheableLookup instance or a boolean, got number'});
+});
+
+test('throws on invalid `agent` option', async t => {
+	await t.throwsAsync(got('https://example.com', {
+		agent: {
+			// @ts-ignore Error tests
+			asdf: 123
+		}
+	}), {message: 'Expected the `options.agent` properties to be `http`, `https` or `http2`, got `asdf`'});
+});
+
+test('fallbacks to native http if `request(...)` returns undefined', withServer, async (t, server, got) => {
+	server.get('/', echoUrl);
+
+	const {body} = await got('', {request: () => undefined});
+
+	t.is(body, '/');
+});

@@ -6,7 +6,7 @@ import delay = require('delay');
 import {Handler} from 'express';
 import getStream = require('get-stream');
 import toReadableStream = require('to-readable-stream');
-import got from '../source';
+import got, {UploadError} from '../source';
 import withServer from './helpers/with-server';
 
 const pStreamPipeline = promisify(stream.pipeline);
@@ -302,4 +302,27 @@ test('catches body errors before calling pipeline() - stream', withServer, async
 
 	// Wait for unhandled errors
 	await delay(100);
+});
+
+test('throws on upload error', withServer, async (t, server, got) => {
+	server.post('/', defaultEndpoint);
+
+	const body = new stream.PassThrough();
+	const message = 'oh no';
+
+	await t.throwsAsync(getStream(got.stream.post({
+		body,
+		hooks: {
+			beforeRequest: [
+				() => {
+					process.nextTick(() => {
+						body.destroy(new Error(message));
+					});
+				}
+			]
+		}
+	})), {
+		instanceOf: UploadError,
+		message
+	});
 });
