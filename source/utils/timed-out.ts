@@ -79,8 +79,7 @@ export default (request: ClientRequest, delaysOrNumber: Delays | number, options
 			(request.socket as any)._hadError = true;
 		}
 
-		request.abort();
-		request.emit('error', new TimeoutError(delay, event));
+		request.destroy(new TimeoutError(delay, event));
 	};
 
 	const cancelTimeouts = (): void => {
