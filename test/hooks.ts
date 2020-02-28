@@ -1,8 +1,10 @@
+import {URL} from 'url';
 import test from 'ava';
 import getStream from 'get-stream';
 import delay = require('delay');
 import {Handler} from 'express';
-import got from '../source';
+import Responselike = require('responselike');
+import got, {RequestError} from '../source';
 import withServer from './helpers/with-server';
 
 const errorString = 'oops';
@@ -10,6 +12,10 @@ const error = new Error(errorString);
 
 const echoHeaders: Handler = (request, response) => {
 	response.end(JSON.stringify(request.headers));
+};
+
+const echoUrl: Handler = (request, response) => {
+	response.end(request.url);
 };
 
 const retryEndpoint: Handler = (request, response) => {
@@ -104,12 +110,16 @@ test('catches afterResponse thrown errors', withServer, async (t, server, got) =
 	}), {message: errorString});
 });
 
-test('throws a helpful error when passing async function as init hook', async t => {
-	await t.throwsAsync(got('https://example.com', {
+test('accepts an async function as init hook', async t => {
+	await got('https://example.com', {
 		hooks: {
-			init: [async () => {}]
+			init: [
+				async () => {
+					t.pass();
+				}
+			]
 		}
-	}), {message: 'The `init` hook must be a synchronous function'});
+	});
 });
 
 test('catches beforeRequest promise rejections', async t => {
@@ -192,7 +202,6 @@ test('init is called with options', withServer, async (t, server, got) => {
 		hooks: {
 			init: [
 				options => {
-					t.is(options.url, undefined);
 					t.is(options.context, context);
 				}
 			]
@@ -210,7 +219,6 @@ test('init from defaults is called with options', withServer, async (t, server, 
 		hooks: {
 			init: [
 				options => {
-					t.is(options.url, undefined);
 					t.is(options.context, context);
 				}
 			]
@@ -269,6 +277,29 @@ test('beforeRequest allows modifications', withServer, async (t, server, got) =>
 		}
 	});
 	t.is(body.foo, 'bar');
+});
+
+test('returning HTTP response from a beforeRequest hook', withServer, async (t, server, got) => {
+	server.get('/', echoUrl);
+
+	const {statusCode, headers, body} = await got({
+		hooks: {
+			beforeRequest: [
+				() => {
+					return new Responselike(
+						200,
+						{foo: 'bar'},
+						Buffer.from('Hi!'),
+						''
+					);
+				}
+			]
+		}
+	});
+
+	t.is(statusCode, 200);
+	t.is(headers.foo, 'bar');
+	t.is(body, 'Hi!');
 });
 
 test('beforeRedirect is called with options and response', withServer, async (t, server, got) => {
@@ -579,7 +610,6 @@ test('throwing in a beforeError hook - promise', withServer, async (t, server, g
 		response.end('ok');
 	});
 
-	// @ts-ignore Error tests
 	await t.throwsAsync(got({
 		hooks: {
 			afterResponse: [
@@ -588,11 +618,11 @@ test('throwing in a beforeError hook - promise', withServer, async (t, server, g
 				}
 			],
 			beforeError: [
-				() => {
+				(): never => {
 					throw new Error('foobar');
 				},
 				() => {
-					t.fail('This shouldn\'t be called at all');
+					throw new Error('This shouldn\'t be called at all');
 				}
 			]
 		}
@@ -600,7 +630,6 @@ test('throwing in a beforeError hook - promise', withServer, async (t, server, g
 });
 
 test('throwing in a beforeError hook - stream', withServer, async (t, _server, got) => {
-	// @ts-ignore Error tests
 	await t.throwsAsync(getStream(got.stream({
 		hooks: {
 			beforeError: [
@@ -608,7 +637,7 @@ test('throwing in a beforeError hook - stream', withServer, async (t, _server, g
 					throw new Error('foobar');
 				},
 				() => {
-					t.fail('This shouldn\'t be called at all');
+					throw new Error('This shouldn\'t be called at all');
 				}
 			]
 		}
@@ -654,9 +683,13 @@ test('beforeError allows modifications', async t => {
 			throw error;
 		},
 		hooks: {
-			beforeError: [() => {
-				return new Error(errorString2);
-			}]
+			beforeError: [
+				error => {
+					const newError = new Error(errorString2);
+
+					return new RequestError(newError.message, newError, error.options);
+				}
+			]
 		}
 	}), {message: errorString2});
 });
@@ -669,9 +702,9 @@ test('does not break on `afterResponse` hook with JSON mode', withServer, async 
 			afterResponse: [
 				(response, retryWithMergedOptions) => {
 					if (response.statusCode === 404) {
-						return retryWithMergedOptions({
-							path: '/foobar'
-						});
+						const url = new URL('/foobar', response.url);
+
+						return retryWithMergedOptions({url});
 					}
 
 					return response;
@@ -688,7 +721,7 @@ test('catches HTTPErrors', withServer, async (t, _server, got) => {
 	await t.throwsAsync(got({
 		hooks: {
 			beforeError: [
-				(error: Error) => {
+				error => {
 					t.true(error instanceof got.HTTPError);
 					return error;
 				}

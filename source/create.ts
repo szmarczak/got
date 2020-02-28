@@ -1,22 +1,50 @@
-import {Merge} from 'type-fest';
-import is from '@sindresorhus/is';
-import asPromise, {createRejection} from './as-promise';
-import asStream, {ProxyStream} from './as-stream';
-import * as errors from './errors';
-import {normalizeArguments, mergeOptions} from './normalize-arguments';
-import deepFreeze from './utils/deep-freeze';
-import {
-	CancelableRequest,
-	Defaults,
-	DefaultOptions,
-	ExtendOptions,
-	HandlerFunction,
+import {URL} from 'url';
+import {CancelError} from 'p-cancelable';
+import asPromise, {
+	PromisableRequest,
 	NormalizedOptions,
+	CancelableRequest,
 	Options,
 	Response,
-	URLOrOptions,
+	Defaults as DefaultOptions,
+	ParseError,
 	PaginationOptions
-} from './types';
+} from './as-promise';
+import createRejection from './as-promise/create-rejection';
+import Request, {
+	RequestError,
+	CacheError,
+	ReadError,
+	HTTPError,
+	MaxRedirectsError,
+	TimeoutError,
+	UnsupportedProtocolError,
+	UploadError,
+	kIsNormalizedAlready
+} from './core';
+import deepFreeze from './utils/deep-freeze';
+
+export interface InstanceDefaults {
+	options: DefaultOptions;
+	handlers: HandlerFunction[];
+	mutableDefaults: boolean;
+	_rawHandlers?: HandlerFunction[];
+}
+
+const errors = {
+	RequestError,
+	CacheError,
+	ReadError,
+	HTTPError,
+	MaxRedirectsError,
+	TimeoutError,
+	ParseError,
+	CancelError,
+	UnsupportedProtocolError,
+	UploadError
+};
+
+const {normalizeArguments} = PromisableRequest;
 
 export type HTTPAlias =
 	| 'get'
@@ -26,68 +54,94 @@ export type HTTPAlias =
 	| 'head'
 	| 'delete';
 
-export type ReturnStream = <T>(url: string | Merge<Options, {isStream?: true}>, options?: Merge<Options, {isStream?: true}>) => ProxyStream<T>;
-export type GotReturn<T = unknown> = CancelableRequest<T> | ProxyStream<T>;
+export type GotReturn = Request | CancelableRequest;
 
-const getPromiseOrStream = (options: NormalizedOptions): GotReturn => options.isStream ? asStream(options) : asPromise(options);
+interface GotStreamFunction {
+	(url: string | URL, options?: Options & {isStream?: true}): Request;
+	(options?: Options & {isStream?: true}): Request;
+}
+
+const getPromiseOrStream = (options: NormalizedOptions): GotReturn => options.isStream ? new Request(options.url, options) : asPromise(options);
+
+export type HandlerFunction = <T extends GotReturn>(options: NormalizedOptions, next: (options: NormalizedOptions) => T) => T | Promise<T>;
+
+export interface ExtendOptions extends Options {
+	handlers?: HandlerFunction[];
+	mutableDefaults?: boolean;
+}
 
 const isGotInstance = (value: Got | ExtendOptions): value is Got => (
-	Reflect.has(value, 'defaults') && Reflect.has(value.defaults, 'options')
+	'defaults' in value && 'options' in value.defaults
 );
 
-export type OptionsOfDefaultResponseBody = Merge<Options, {isStream?: false; resolveBodyOnly?: false; responseType?: 'default'}>;
-type OptionsOfTextResponseBody = Merge<Options, {isStream?: false; resolveBodyOnly?: false; responseType: 'text'}>;
-type OptionsOfJSONResponseBody = Merge<Options, {isStream?: false; resolveBodyOnly?: false; responseType: 'json'}>;
-type OptionsOfBufferResponseBody = Merge<Options, {isStream?: false; resolveBodyOnly?: false; responseType: 'buffer'}>;
+type Except<ObjectType, KeysType extends keyof ObjectType> = Pick<ObjectType, Exclude<keyof ObjectType, KeysType>>;
+
+export type OptionsOfTextResponseBody = Options & {isStream?: false; resolveBodyOnly?: false; responseType?: 'text'};
+export type OptionsOfJSONResponseBody = Options & {isStream?: false; resolveBodyOnly?: false; responseType: 'json'};
+export type OptionsOfBufferResponseBody = Options & {isStream?: false; resolveBodyOnly?: false; responseType: 'buffer'};
+export type GotStrictOptions = Except<Options, 'isStream' | 'responseType' | 'resolveBodyOnly'>;
 type ResponseBodyOnly = {resolveBodyOnly: true};
 
-/**
-Can be used to match methods explicitly or parameters extraction: `Parameters<GotRequestMethod>`.
-*/
-export interface GotRequestMethod {
+export interface GotPaginate {
+	<T>(url: string | URL, options?: Options & PaginationOptions<T>): AsyncIterableIterator<T>;
+	all<T>(url: string | URL, options?: Options & PaginationOptions<T>): Promise<T[]>;
+
+	// A bug.
+	// eslint-disable-next-line @typescript-eslint/adjacent-overload-signatures
+	<T>(options?: Options & PaginationOptions<T>): AsyncIterableIterator<T>;
+	// A bug.
+	// eslint-disable-next-line @typescript-eslint/adjacent-overload-signatures
+	all<T>(options?: Options & PaginationOptions<T>): Promise<T[]>;
+}
+
+export interface GotRequest {
 	// `asPromise` usage
-	<T = string>(url: string | OptionsOfDefaultResponseBody, options?: OptionsOfDefaultResponseBody): CancelableRequest<Response<T>>;
-	(url: string | OptionsOfTextResponseBody, options?: OptionsOfTextResponseBody): CancelableRequest<Response<string>>;
-	<T>(url: string | OptionsOfJSONResponseBody, options?: OptionsOfJSONResponseBody): CancelableRequest<Response<T>>;
-	(url: string | OptionsOfBufferResponseBody, options?: OptionsOfBufferResponseBody): CancelableRequest<Response<Buffer>>;
+	(url: string | URL, options?: OptionsOfTextResponseBody): CancelableRequest<Response<string>>;
+	<T>(url: string | URL, options?: OptionsOfJSONResponseBody): CancelableRequest<Response<T>>;
+	(url: string | URL, options?: OptionsOfBufferResponseBody): CancelableRequest<Response<Buffer>>;
+
+	(options: OptionsOfTextResponseBody): CancelableRequest<Response<string>>;
+	<T>(options: OptionsOfJSONResponseBody): CancelableRequest<Response<T>>;
+	(options: OptionsOfBufferResponseBody): CancelableRequest<Response<Buffer>>;
 
 	// `resolveBodyOnly` usage
-	<T = string>(url: string | Merge<OptionsOfDefaultResponseBody, ResponseBodyOnly>, options?: Merge<OptionsOfDefaultResponseBody, ResponseBodyOnly>): CancelableRequest<T>;
-	(url: string | Merge<OptionsOfTextResponseBody, ResponseBodyOnly>, options?: Merge<OptionsOfTextResponseBody, ResponseBodyOnly>): CancelableRequest<string>;
-	<T>(url: string | Merge<OptionsOfJSONResponseBody, ResponseBodyOnly>, options?: Merge<OptionsOfJSONResponseBody, ResponseBodyOnly>): CancelableRequest<T>;
-	(url: string | Merge<OptionsOfBufferResponseBody, ResponseBodyOnly>, options?: Merge<OptionsOfBufferResponseBody, ResponseBodyOnly>): CancelableRequest<Buffer>;
+	(url: string | URL, options?: (OptionsOfTextResponseBody & ResponseBodyOnly)): CancelableRequest<string>;
+	<T>(url: string | URL, options?: (OptionsOfJSONResponseBody & ResponseBodyOnly)): CancelableRequest<T>;
+	(url: string | URL, options?: (OptionsOfBufferResponseBody & ResponseBodyOnly)): CancelableRequest<Buffer>;
+
+	(options: (OptionsOfTextResponseBody & ResponseBodyOnly)): CancelableRequest<string>;
+	<T>(options: (OptionsOfJSONResponseBody & ResponseBodyOnly)): CancelableRequest<T>;
+	(options: (OptionsOfBufferResponseBody & ResponseBodyOnly)): CancelableRequest<Buffer>;
 
 	// `asStream` usage
-	<T>(url: string | Merge<Options, {isStream: true}>, options?: Merge<Options, {isStream: true}>): ProxyStream<T>;
+	(url: string | URL, options?: Options & {isStream: true}): Request;
+
+	(options: Options & {isStream: true}): Request;
+
+	// Fallback
+	(url: string | URL, options?: Options): CancelableRequest | Request;
+
+	(options: Options): CancelableRequest | Request;
 }
 
-export interface GotPaginate {
-	<T>(url: URLOrOptions & PaginationOptions<T>, options?: Options & PaginationOptions<T>): AsyncIterableIterator<T>;
-	all<T>(url: URLOrOptions & PaginationOptions<T>, options?: Options & PaginationOptions<T>): Promise<T[]>;
-}
+export type GotStream = GotStreamFunction & Record<HTTPAlias, GotStreamFunction>;
 
-export interface Got extends Record<HTTPAlias, GotRequestMethod>, GotRequestMethod {
+export interface Got extends Record<HTTPAlias, GotRequest>, GotRequest {
 	stream: GotStream;
 	paginate: GotPaginate;
-	defaults: Defaults;
-	GotError: typeof errors.GotError;
-	CacheError: typeof errors.CacheError;
-	RequestError: typeof errors.RequestError;
-	ReadError: typeof errors.ReadError;
-	ParseError: typeof errors.ParseError;
-	HTTPError: typeof errors.HTTPError;
-	MaxRedirectsError: typeof errors.MaxRedirectsError;
-	UnsupportedProtocolError: typeof errors.UnsupportedProtocolError;
-	TimeoutError: typeof errors.TimeoutError;
-	CancelError: typeof errors.CancelError;
+	defaults: InstanceDefaults;
+	CacheError: typeof CacheError;
+	RequestError: typeof RequestError;
+	ReadError: typeof ReadError;
+	ParseError: typeof ParseError;
+	HTTPError: typeof HTTPError;
+	MaxRedirectsError: typeof MaxRedirectsError;
+	TimeoutError: typeof TimeoutError;
+	CancelError: typeof CancelError;
 
 	extend(...instancesOrOptions: Array<Got | ExtendOptions>): Got;
 	mergeInstances(parent: Got, ...instances: Got[]): Got;
 	mergeOptions(...sources: Options[]): NormalizedOptions;
-}
-
-export interface GotStream extends Record<HTTPAlias, ReturnStream> {
-	(url: URLOrOptions, options?: Options): ProxyStream;
 }
 
 const aliases: readonly HTTPAlias[] = [
@@ -101,7 +155,17 @@ const aliases: readonly HTTPAlias[] = [
 
 export const defaultHandler: HandlerFunction = (options, next) => next(options);
 
-const create = (defaults: Defaults): Got => {
+export const mergeOptions = (...sources: Options[]): NormalizedOptions => {
+	let mergedOptions: NormalizedOptions | undefined;
+
+	for (const source of sources) {
+		mergedOptions = normalizeArguments(undefined, source, mergedOptions);
+	}
+
+	return mergedOptions!;
+};
+
+const create = (defaults: InstanceDefaults): Got => {
 	// Proxy properties from next handlers
 	defaults._rawHandlers = defaults.handlers;
 	defaults.handlers = defaults.handlers.map(fn => ((options, next) => {
@@ -130,8 +194,7 @@ const create = (defaults: Defaults): Got => {
 		return result;
 	}));
 
-	// @ts-ignore Because the for loop handles it for us, as well as the other Object.defines
-	const got: Got = (url: URLOrOptions, options?: Options): GotReturn => {
+	const got: Got = ((url: string | URL, options?: Options): GotReturn => {
 		let iteration = 0;
 		const iterateHandlers = (newOptions: NormalizedOptions): GotReturn => {
 			return defaults.handlers[iteration++](
@@ -140,19 +203,23 @@ const create = (defaults: Defaults): Got => {
 			) as GotReturn;
 		};
 
-		/* eslint-disable @typescript-eslint/return-await */
 		try {
-			return iterateHandlers(normalizeArguments(url, options, defaults));
+			const normalizedOptions = normalizeArguments(url, options, defaults.options);
+			normalizedOptions[kIsNormalizedAlready] = true;
+
+			// A bug.
+			// eslint-disable-next-line @typescript-eslint/return-await
+			return iterateHandlers(normalizedOptions);
 		} catch (error) {
 			if (options?.isStream) {
 				throw error;
 			} else {
-				// @ts-ignore It's an Error not a response, but TS thinks it's calling .resolve
+				// A bug.
+				// eslint-disable-next-line @typescript-eslint/return-await
 				return createRejection(error);
 			}
 		}
-		/* eslint-enable @typescript-eslint/return-await */
-	};
+	}) as Got;
 
 	got.extend = (...instancesOrOptions) => {
 		const optionsArray: Options[] = [defaults.options];
@@ -167,8 +234,8 @@ const create = (defaults: Defaults): Got => {
 			} else {
 				optionsArray.push(value);
 
-				if (Reflect.has(value, 'handlers')) {
-					handlers.push(...value.handlers);
+				if ('handlers' in value) {
+					handlers.push(...value.handlers!);
 				}
 
 				isMutableDefaults = value.mutableDefaults;
@@ -182,44 +249,34 @@ const create = (defaults: Defaults): Got => {
 		}
 
 		return create({
-			options: mergeOptions(...optionsArray) as DefaultOptions,
+			options: mergeOptions(...optionsArray),
 			handlers,
 			mutableDefaults: Boolean(isMutableDefaults)
 		});
 	};
 
-	// @ts-ignore The missing methods because the for-loop handles it for us
-	got.stream = (url, options) => got(url, {...options, isStream: true});
-
-	for (const method of aliases) {
-		// @ts-ignore Cannot properly type a function with multiple definitions yet
-		got[method] = (url: URLOrOptions, options?: Options): GotReturn => got(url, {...options, method});
-		got.stream[method] = (url, options) => got.stream(url, {...options, method});
-	}
-
-	// @ts-ignore The missing property is added below
-	got.paginate = async function * <T>(url: URLOrOptions, options?: Options) {
-		let normalizedOptions = normalizeArguments(url, options, defaults);
+	got.paginate = (async function * <T>(url: string | URL, options?: Options) {
+		let normalizedOptions = normalizeArguments(url, options, defaults.options);
 
 		const pagination = normalizedOptions._pagination!;
 
-		if (!is.object(pagination)) {
-			throw new Error('`options._pagination` must be implemented');
+		if (typeof pagination !== 'object') {
+			throw new TypeError('`options._pagination` must be implemented');
 		}
 
 		const all: T[] = [];
 
 		while (true) {
-			// @ts-ignore See https://github.com/sindresorhus/got/issues/954
+			// TODO: Throw when result is not an instance of Response
 			// eslint-disable-next-line no-await-in-loop
-			const result = await got(normalizedOptions);
+			const result = (await got('', normalizedOptions)) as Response;
 
 			// eslint-disable-next-line no-await-in-loop
-			const parsed = await pagination.transform!(result);
+			const parsed = await pagination.transform(result);
 
 			for (const item of parsed) {
-				if (pagination.filter!(item, all)) {
-					if (!pagination.shouldContinue!(item, all)) {
+				if (pagination.filter(item, all)) {
+					if (!pagination.shouldContinue(item, all)) {
 						return;
 					}
 
@@ -233,19 +290,19 @@ const create = (defaults: Defaults): Got => {
 				}
 			}
 
-			const optionsToMerge = pagination.paginate!(result);
+			const optionsToMerge = pagination.paginate(result);
 
 			if (optionsToMerge === false) {
 				return;
 			}
 
 			if (optionsToMerge !== undefined) {
-				normalizedOptions = normalizeArguments(normalizedOptions, optionsToMerge);
+				normalizedOptions = normalizeArguments(undefined, optionsToMerge, normalizedOptions);
 			}
 		}
-	};
+	}) as GotPaginate;
 
-	got.paginate.all = async <T>(url: URLOrOptions, options?: Options) => {
+	got.paginate.all = (async <T>(url: string | URL, options?: Options) => {
 		const results: T[] = [];
 
 		for await (const item of got.paginate<unknown>(url, options)) {
@@ -253,7 +310,17 @@ const create = (defaults: Defaults): Got => {
 		}
 
 		return results;
-	};
+	}) as GotPaginate['all'];
+
+	got.stream = ((url: string | URL, options?: Options) => got(url, {...options, isStream: true})) as GotStream;
+
+	for (const method of aliases) {
+		got[method] = ((url: string | URL, options?: Options): GotReturn => got(url, {...options, method})) as GotRequest;
+
+		got.stream[method] = ((url: string | URL, options?: Options & {isStream: true}) => {
+			return got(url, {...options, method, isStream: true});
+		}) as GotStream;
+	}
 
 	Object.assign(got, {...errors, mergeOptions});
 	Object.defineProperty(got, 'defaults', {

@@ -31,7 +31,7 @@ if (process.platform !== 'win32') {
 	});
 
 	test('throws on invalid URL', async t => {
-		await t.throwsAsync(got('unix:'), {
+		await t.throwsAsync(got('unix:', {retry: 0}), {
 			instanceOf: got.RequestError,
 			code: 'ENOTFOUND'
 		});

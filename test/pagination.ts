@@ -1,3 +1,4 @@
+import {URL} from 'url';
 import test from 'ava';
 import got, {Response} from '../source';
 import withServer from './helpers/with-server';
@@ -82,7 +83,7 @@ test('filters elements', withServer, async (t, server, got) => {
 
 	const result = await got.paginate.all({
 		_pagination: {
-			filter: element => element !== 2
+			filter: (element: unknown) => element !== 2
 		}
 	});
 
@@ -119,11 +120,15 @@ test('custom paginate function', withServer, async (t, server, got) => {
 	const result = await got.paginate.all({
 		_pagination: {
 			paginate: response => {
-				if (response.request.options.path === '/?page=3') {
+				const url = new URL(response.url);
+
+				if (url.search === '?page=3') {
 					return false;
 				}
 
-				return {path: '/?page=3'};
+				url.search = '?page=3';
+
+				return {url};
 			}
 		}
 	});
@@ -221,7 +226,8 @@ test('throws if the `pagination` option does not have `filter` property', async 
 		_pagination: {
 			...resetPagination,
 			transform: thrower,
-			shouldContinue: thrower
+			shouldContinue: thrower,
+			paginate: thrower
 		},
 		prefixUrl: 'https://example.com'
 	});
