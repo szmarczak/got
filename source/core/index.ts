@@ -1259,9 +1259,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				this._onRequest(requestOrResponse);
 
 				// Emit the response after the stream has been ended
-			} else if (this.writableFinished) {
-				this._onResponse(requestOrResponse as IncomingMessage);
-			} else {
+			} else if (this.writable) {
 				this.once('finish', () => {
 					this._onResponse(requestOrResponse as IncomingMessage);
 				});
@@ -1269,6 +1267,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				this._unlockWrite();
 				this.end();
 				this._lockWrite();
+			} else {
+				this._onResponse(requestOrResponse as IncomingMessage);
 			}
 		} catch (error) {
 			if (error instanceof RequestError) {
