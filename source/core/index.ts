@@ -602,33 +602,55 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			throw new TypeError('The legacy `url.Url` has been deprecated. Use `URL` instead.');
 		}
 
+		// Verify types
+		if (is.null_(options.encoding)) {
+			throw new TypeError('To get a Buffer, set `options.responseType` to `buffer` instead');
+		}
+
+		assert.any([is.string, is.undefined], options.method);
+		assert.any([is.object, is.undefined], options.headers);
+		assert.any([is.string, is.urlInstance, is.undefined], options.prefixUrl);
+		assert.any([is.object, is.undefined], options.cookieJar);
+		assert.any([is.object, is.string, is.undefined], options.searchParams);
+		assert.any([is.object, is.string, is.undefined], options.cache);
+		assert.any([is.object, is.number, is.undefined], options.timeout);
+		assert.any([is.object, is.undefined], options.context);
+		assert.any([is.object, is.undefined], options.hooks);
+		assert.any([is.boolean, is.undefined], options.decompress);
+		assert.any([is.boolean, is.undefined], options.ignoreInvalidCookies);
+		assert.any([is.string, is.undefined], options.encoding);
+		assert.any([is.boolean, is.undefined], options.followRedirect);
+		assert.any([is.string, is.undefined], options.encoding);
+		assert.any([is.number, is.undefined], options.maxRedirects);
+		assert.any([is.boolean, is.undefined], options.throwHttpErrors);
+		assert.any([is.boolean, is.undefined], options.http2);
+		assert.any([is.boolean, is.undefined], options.allowGetBody);
+		assert.any([is.boolean, is.undefined], options.rejectUnauthorized);
+		assert.any([is.plainObject, is.boolean, is.undefined], options.agent);
+
 		// `options.method`
 		if (is.string(options.method)) {
 			options.method = options.method.toUpperCase();
-		} else if (is.undefined(options.method)) {
-			options.method = 'GET';
 		} else {
-			throw new TypeError(`Parameter \`method\` must be a string, got ${is(options.method)}`);
+			options.method = 'GET';
 		}
 
 		// `options.headers`
 		if (is.undefined(options.headers)) {
 			options.headers = {};
-		} else if (is.object(options.headers)) {
-			options.headers = lowercaseKeys({...(defaults?.headers), ...options.headers});
 		} else {
-			throw new TypeError(`Parameter \`headers\` must be an object, got ${is(options.headers)}`);
+			options.headers = lowercaseKeys({...(defaults?.headers), ...options.headers});
 		}
 
 		// `options.prefixUrl` & `options.url`
-		if (is.string(options.prefixUrl) || is.urlInstance(options.prefixUrl)) {
+		if (options.prefixUrl) {
 			options.prefixUrl = options.prefixUrl.toString();
 
 			if (options.prefixUrl !== '' && !options.prefixUrl.endsWith('/')) {
 				options.prefixUrl += '/';
 			}
 		} else {
-			throw new TypeError(`Parameter \`prefixUrl\` must be a string or a URL instance, got ${is(options.prefixUrl)}`);
+			options.prefixUrl = '';
 		}
 
 		if (is.string(options.url)) {
@@ -679,11 +701,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 
 		// `options.cookieJar`
-		if (!options.cookieJar && defaults) {
-			options.cookieJar = defaults.cookieJar;
-		}
-
-		if (is.object(options.cookieJar)) {
+		if (options.cookieJar) {
 			let {setCookie, getCookieString} = options.cookieJar;
 
 			// Horrible `tough-cookie` check
@@ -699,12 +717,10 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			}
 
 			options.cookieJar = {setCookie, getCookieString};
-		} else if (!is.undefined(options.cookieJar)) {
-			throw new TypeError(`Parameter \`cookieJar\` must be an object, got ${is(options.cookieJar)}`);
 		}
 
 		// `options.searchParams`
-		if (is.string(options.searchParams) || is.object(options.searchParams)) {
+		if (options.searchParams) {
 			if (!is.string(options.searchParams) && !(options.searchParams instanceof URLSearchParams)) {
 				validateSearchParams(options.searchParams);
 			}
@@ -722,23 +738,15 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			if (options.url) {
 				options.url.search = options.searchParams.toString();
 			}
-		} else if (!is.undefined(options.searchParams)) {
-			throw new TypeError(`Parameter \`searchParams\` must be an object or a string, got ${is(options.searchParams)}`);
 		}
 
 		// `options.cache`
-		if (!options.cache && defaults) {
-			options.cache = defaults.cache;
-		}
-
-		if ((is.object(options.cache) || is.string(options.cache)) && !(options as NormalizedOptions).cacheableRequest) {
+		if (options.cache && !(options as NormalizedOptions).cacheableRequest) {
 			// Better memory management, so we don't have to generate a new object every time
 			(options as NormalizedOptions).cacheableRequest = new CacheableRequest(
 				((requestOptions: RequestOptions, handler?: (response: IncomingMessage) => void): ClientRequest => (requestOptions as Pick<NormalizedOptions, typeof kRequest>)[kRequest](requestOptions, handler)) as HttpRequestFunction,
 				options.cache
 			);
-		} else if (!is.undefined(options.cache)) {
-			throw new TypeError(`Parameter \`cache\` must be an object, got ${is(options.cache)}`);
 		}
 
 		// `options.dnsCache`
@@ -751,10 +759,8 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		// `options.timeout`
 		if (is.number(options.timeout)) {
 			options.timeout = {request: options.timeout};
-		} else if (is.object(options.timeout)) {
-			options.timeout = {...options.timeout};
 		} else {
-			throw new TypeError(`Parameter \`timeout\` must be an object or a number, got ${is(options.timeout)}`);
+			options.timeout = {...options.timeout};
 		}
 
 		if (defaults) {
@@ -765,32 +771,24 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 
 		// `options.context`
-		if (is.undefined(options.context)) {
-			if (!defaults?.context) {
-				options.context = {};
-			}
-		} else if (!is.object(options.context)) {
-			throw new TypeError(`Parameter \`context\` must be an object, got ${is('options.context')}`);
+		if (!options.context) {
+			options.context = {};
 		}
 
 		// `options.hooks`
-		if (is.object(options.hooks) || is.undefined(options.hooks)) {
-			options.hooks = {...options.hooks};
+		options.hooks = {...options.hooks};
 
-			for (const event of knownHookEvents) {
-				if (event in options.hooks) {
-					if (Array.isArray(options.hooks[event])) {
-						// See https://github.com/microsoft/TypeScript/issues/31445#issuecomment-576929044
-						(options.hooks as any)[event] = [...options.hooks[event]!];
-					} else {
-						throw new TypeError(`Parameter \`${event}\` must be an Array, got ${is(options.hooks[event])}`);
-					}
+		for (const event of knownHookEvents) {
+			if (event in options.hooks) {
+				if (Array.isArray(options.hooks[event])) {
+					// See https://github.com/microsoft/TypeScript/issues/31445#issuecomment-576929044
+					(options.hooks as any)[event] = [...options.hooks[event]!];
 				} else {
-					options.hooks[event] = [];
+					throw new TypeError(`Parameter \`${event}\` must be an Array, got ${is(options.hooks[event])}`);
 				}
+			} else {
+				options.hooks[event] = [];
 			}
-		} else {
-			throw new TypeError(`Parameter \`hooks\` must be an Object, got ${is(options.hooks)}`);
 		}
 
 		if (defaults?.hooks) {
@@ -806,10 +804,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 
 		// Other options
-		if (is.null_(options.encoding)) {
-			throw new TypeError('To get a Buffer, set `options.responseType` to `buffer` instead');
-		}
-
 		if ('followRedirects' in options) {
 			throw new TypeError('The `followRedirects` option does not exist. Use `followRedirect` instead.');
 		}
@@ -821,18 +815,6 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				}
 			}
 		}
-
-		assert.any([is.boolean, is.undefined], options.decompress);
-		assert.any([is.boolean, is.undefined], options.ignoreInvalidCookies);
-		assert.any([is.string, is.undefined], options.encoding);
-		assert.any([is.boolean, is.undefined], options.followRedirect);
-		assert.any([is.string, is.undefined], options.encoding);
-		assert.any([is.number, is.undefined], options.maxRedirects);
-		assert.any([is.boolean, is.undefined], options.throwHttpErrors);
-		assert.any([is.boolean, is.undefined], options.http2);
-		assert.any([is.boolean, is.undefined], options.allowGetBody);
-		assert.any([is.boolean, is.undefined], options.rejectUnauthorized);
-		assert.any([is.plainObject, is.undefined, is.boolean], options.agent);
 
 		options.decompress = Boolean(options.decompress);
 		options.ignoreInvalidCookies = Boolean(options.ignoreInvalidCookies);

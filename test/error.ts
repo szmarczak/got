@@ -183,7 +183,7 @@ test('errors are thrown directly when options.stream is true', t => {
 		// @ts-ignore Error tests
 		got('https://example.com', {isStream: true, hooks: false});
 	}, {
-		message: 'Parameter `hooks` must be an Object, got boolean'
+		message: 'Expected value which is `predicate returns truthy for any value`, received value of type `Array`.'
 	});
 });
 

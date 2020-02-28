@@ -187,7 +187,7 @@ test('throws TypeError when `options.hooks` is not an object', async t => {
 		// @ts-ignore Error tests
 		got('https://example.com', {hooks: 'not object'}),
 		{
-			message: 'Parameter `hooks` must be an Object, got string'
+			message: 'Expected value which is `predicate returns truthy for any value`, received value of type `Array`.'
 		}
 	);
 });
@@ -360,41 +360,6 @@ test('throws a helpful error when passing `followRedirects`', async t => {
 	}), {message: 'The `followRedirects` option does not exist. Use `followRedirect` instead.'});
 });
 
-test('throws on invalid `timeout` option', async t => {
-	// @ts-ignore For testing purposes
-	await t.throwsAsync(got('https://example.com', {
-		timeout: 'asdf'
-	}), {message: 'Parameter `timeout` must be an object or a number, got string'});
-});
-
-test('throws on invalid `dnsCache` option', async t => {
-	// @ts-ignore For testing purposes
-	await t.throwsAsync(got('https://example.com', {
-		dnsCache: 'asdf'
-	}), {message: 'Parameter `dnsCache` must be a CacheableLookup instance or a boolean, got string'});
-});
-
-test('throws on invalid `cache` option', async t => {
-	// @ts-ignore For testing purposes
-	await t.throwsAsync(got('https://example.com', {
-		cache: 3
-	}), {message: 'Parameter `cache` must be an object, got number'});
-});
-
-test('throws on invalid `searchParams` option', async t => {
-	// @ts-ignore For testing purposes
-	await t.throwsAsync(got('https://example.com', {
-		searchParams: 3
-	}), {message: 'Parameter `searchParams` must be an object or a string, got number'});
-});
-
-test('throws on invalid `cookieJar` option', async t => {
-	// @ts-ignore For testing purposes
-	await t.throwsAsync(got('https://example.com', {
-		cookieJar: 3
-	}), {message: 'Parameter `cookieJar` must be an object, got number'});
-});
-
 test('merges `searchParams` instances', t => {
 	const instance = got.extend({
 		searchParams: new URLSearchParams('a=1')
@@ -419,11 +384,4 @@ test('throws when input starts with a slash and the `prefixUrl` option is presen
 	await t.throwsAsync(got('/asdf', {prefixUrl: 'https://example.com'}), {
 		message: '`input` must not start with a slash when using `prefixUrl`'
 	});
-});
-
-test('throws on invalid `prefixUrl` option', async t => {
-	// @ts-ignore For testing purposes
-	await t.throwsAsync(got('https://example.com', {
-		prefixUrl: 3
-	}), {message: 'Parameter `prefixUrl` must be a string or a URL instance, got number'});
 });
