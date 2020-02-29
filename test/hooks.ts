@@ -776,3 +776,25 @@ test('timeout can be modified using a hook', withServer, async (t, server, got) 
 		retry: 0
 	}), {message: 'Timeout awaiting \'request\' for 500ms'});
 });
+
+test('beforeRequest hook is called before each request', withServer, async (t, server, got) => {
+	server.post('/', echoUrl);
+	server.post('/redirect', redirectEndpoint);
+
+	const buffer = Buffer.from('Hello, Got!');
+	let counts = 0;
+
+	await got.post('redirect', {
+		body: buffer,
+		hooks: {
+			beforeRequest: [
+				options => {
+					counts++;
+					t.is(options.headers['content-length'], String(buffer.length));
+				}
+			]
+		}
+	});
+
+	t.is(counts, 2);
+});
