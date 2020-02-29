@@ -419,3 +419,15 @@ test('strict options', withServer, async (t, server, got) => {
 
 	t.is(body, '/');
 });
+
+test('does not throw on frozen options', withServer, async (t, server, got) => {
+	server.get('/', echoUrl);
+
+	const options: StrictOptions = {};
+
+	Object.freeze(options);
+
+	const {body} = await got(options);
+
+	t.is(body, '/');
+});
