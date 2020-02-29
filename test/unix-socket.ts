@@ -44,4 +44,11 @@ if (process.platform !== 'win32') {
 		const instance = got.extend({prefixUrl: url});
 		t.is((await instance('')).body, 'ok');
 	});
+
+	test('passes search params', withSocketServer, async (t, server) => {
+		server.on('/?a=1', okHandler);
+
+		const url = format('http://unix:%s:%s', server.socketPath, '/?a=1');
+		t.is((await got(url)).body, 'ok');
+	});
 }
