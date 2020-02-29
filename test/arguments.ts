@@ -380,7 +380,7 @@ test('throws a helpful error when passing `auth`', async t => {
 	});
 });
 
-test('throws when input starts with a slash and the `prefixUrl` option is present', async t => {
+test('throws on leading slashes', async t => {
 	await t.throwsAsync(got('/asdf', {prefixUrl: 'https://example.com'}), {
 		message: '`input` must not start with a slash when using `prefixUrl`'
 	});

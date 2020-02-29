@@ -81,7 +81,7 @@ export type Method =
 
 type Promisable<T> = T | Promise<T>;
 
-export type InitHook = (options: Options & {url: string | URL}) => Promisable<void>;
+export type InitHook = (options: Options) => Promisable<void>;
 export type BeforeRequestHook = (options: NormalizedOptions) => Promisable<void | Response | ResponseLike>;
 export type BeforeRedirectHook = (options: NormalizedOptions, response: Response) => Promisable<void>;
 export type BeforeErrorHook = (error: RequestError) => Promisable<RequestError>;
@@ -507,47 +507,31 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			}
 		});
 
+		const {json, body, form} = options;
+		if (json || body || form) {
+			this._lockWrite();
+		}
+
 		(async (nonNormalizedOptions: Options) => {
 			try {
-				{
-					const {json, body, form} = nonNormalizedOptions;
-					if (json || body || form) {
-						this._lockWrite();
-					}
-				}
-
 				if (nonNormalizedOptions.body instanceof ReadStream) {
 					await waitForOpenFile(nonNormalizedOptions.body);
 				}
 
-				const initHooks = nonNormalizedOptions.hooks?.init;
-				const hasInitHooks = initHooks && initHooks.length !== 0;
-				if (hasInitHooks) {
-					nonNormalizedOptions.url = url;
-
-					for (const hook of initHooks!) {
-						// eslint-disable-next-line no-await-in-loop
-						await hook(nonNormalizedOptions as Options & {url: string | URL});
-					}
-
-					url = nonNormalizedOptions.url;
-					nonNormalizedOptions.url = undefined;
-				}
-
-				if (kIsNormalizedAlready in nonNormalizedOptions && !hasInitHooks) {
+				if (kIsNormalizedAlready in nonNormalizedOptions) {
 					this.options = nonNormalizedOptions as NormalizedOptions;
 				} else {
 					// @ts-ignore Common TypeScript bug saying that `this.constructor` is not accessible
 					this.options = this.constructor.normalizeArguments(url, nonNormalizedOptions, defaults);
 				}
 
-				const {options} = this;
+				const {url: normalizedURL} = this.options;
 
-				if (!options.url) {
+				if (!normalizedURL) {
 					throw new TypeError('Missing `url` property');
 				}
 
-				this.requestUrl = options.url.toString();
+				this.requestUrl = normalizedURL.toString();
 				decodeURI(this.requestUrl);
 
 				await this._finalizeBody();

@@ -62,6 +62,38 @@ test('catches init thrown errors', async t => {
 	}), {message: errorString});
 });
 
+test('passes init thrown errors to beforeError hooks (promise-only)', async t => {
+	t.plan(2);
+
+	await t.throwsAsync(got('https://example.com', {
+		hooks: {
+			init: [() => {
+				throw error;
+			}],
+			beforeError: [error => {
+				t.is(error.message, errorString);
+
+				return error;
+			}]
+		}
+	}), {message: errorString});
+});
+
+test('passes init thrown errors to beforeError hooks (promise-only) - beforeError rejection', async t => {
+	const message = 'foo, bar!';
+
+	await t.throwsAsync(got('https://example.com', {
+		hooks: {
+			init: [() => {
+				throw error;
+			}],
+			beforeError: [() => {
+				throw new Error(message);
+			}]
+		}
+	}), {message});
+});
+
 test('catches beforeRequest thrown errors', async t => {
 	await t.throwsAsync(got('https://example.com', {
 		hooks: {
@@ -233,12 +265,11 @@ test('init allows modifications', withServer, async (t, server, got) => {
 		response.end(request.headers.foo);
 	});
 
-	const {body} = await got('meh', {
+	const {body} = await got('', {
 		headers: {},
 		hooks: {
 			init: [
 				options => {
-					options.url = '';
 					options.headers!.foo = 'bar';
 				}
 			]

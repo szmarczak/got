@@ -1,17 +1,22 @@
 import {URL} from 'url';
 import {CancelError} from 'p-cancelable';
 import asPromise, {
+	// Request & Response
 	PromisableRequest,
-	NormalizedOptions,
 	CancelableRequest,
-	Options,
 	Response,
+
+	// Options
+	Options,
+	NormalizedOptions,
 	Defaults as DefaultOptions,
+	PaginationOptions,
+
+	// Hooks
+	InitHook,
+
+	// Errors
 	ParseError,
-	PaginationOptions
-} from './as-promise';
-import createRejection from './as-promise/create-rejection';
-import Request, {
 	RequestError,
 	CacheError,
 	ReadError,
@@ -19,10 +24,12 @@ import Request, {
 	MaxRedirectsError,
 	TimeoutError,
 	UnsupportedProtocolError,
-	UploadError,
-	kIsNormalizedAlready
-} from './core';
+	UploadError
+} from './as-promise';
+import createRejection from './as-promise/create-rejection';
+import Request, {kIsNormalizedAlready} from './core';
 import deepFreeze from './utils/deep-freeze';
+import is from '@sindresorhus/is/dist';
 
 export interface InstanceDefaults {
 	options: DefaultOptions;
@@ -164,6 +171,14 @@ export const mergeOptions = (...sources: Options[]): NormalizedOptions => {
 	return mergedOptions!;
 };
 
+const callInitHooks = (hooks: InitHook[] | undefined, options: Options): void => {
+	if (hooks) {
+		for (const hook of hooks) {
+			hook(options);
+		}
+	}
+};
+
 const create = (defaults: InstanceDefaults): Got => {
 	// Proxy properties from next handlers
 	defaults._rawHandlers = defaults.handlers;
@@ -193,7 +208,7 @@ const create = (defaults: InstanceDefaults): Got => {
 		return result;
 	}));
 
-	const got: Got = ((url: string | URL, options?: Options): GotReturn => {
+	const got: Got = ((url: string | URL, options: Options = {}): GotReturn => {
 		let iteration = 0;
 		const iterateHandlers = (newOptions: NormalizedOptions): GotReturn => {
 			return defaults.handlers[iteration++](
@@ -202,9 +217,32 @@ const create = (defaults: InstanceDefaults): Got => {
 			) as GotReturn;
 		};
 
+		if (is.plainObject(url)) {
+			options = {
+				...url as Options,
+				...options
+			};
+
+			url = undefined as any;
+		}
+
 		try {
+			// Call `init` hooks
+			let initHookError: Error | undefined;
+			try {
+				callInitHooks(defaults.options.hooks.init, options);
+				callInitHooks(options?.hooks?.init, options);
+			} catch (error) {
+				initHookError = error;
+			}
+
+			// Normalize options & call handlers
 			const normalizedOptions = normalizeArguments(url, options, defaults.options);
 			normalizedOptions[kIsNormalizedAlready] = true;
+
+			if (initHookError) {
+				throw new RequestError(initHookError.message, initHookError, normalizedOptions);
+			}
 
 			// A bug.
 			// eslint-disable-next-line @typescript-eslint/return-await
@@ -215,7 +253,7 @@ const create = (defaults: InstanceDefaults): Got => {
 			} else {
 				// A bug.
 				// eslint-disable-next-line @typescript-eslint/return-await
-				return createRejection(error);
+				return createRejection(error, defaults.options.hooks.beforeError, options?.hooks?.beforeError);
 			}
 		}
 	}) as Got;
@@ -259,7 +297,7 @@ const create = (defaults: InstanceDefaults): Got => {
 
 		const pagination = normalizedOptions._pagination!;
 
-		if (typeof pagination !== 'object') {
+		if (!is.object(pagination)) {
 			throw new TypeError('`options._pagination` must be implemented');
 		}
 
