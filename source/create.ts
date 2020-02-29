@@ -46,24 +46,10 @@ const errors = {
 
 const {normalizeArguments} = PromisableRequest;
 
-export type HTTPAlias =
-	| 'get'
-	| 'post'
-	| 'put'
-	| 'patch'
-	| 'head'
-	| 'delete';
-
 export type GotReturn = Request | CancelableRequest;
-
-interface GotStreamFunction {
-	(url: string | URL, options?: Options & {isStream?: true}): Request;
-	(options?: Options & {isStream?: true}): Request;
-}
+export type HandlerFunction = <T extends GotReturn>(options: NormalizedOptions, next: (options: NormalizedOptions) => T) => T | Promise<T>;
 
 const getPromiseOrStream = (options: NormalizedOptions): GotReturn => options.isStream ? new Request(options.url, options) : asPromise(options);
-
-export type HandlerFunction = <T extends GotReturn>(options: NormalizedOptions, next: (options: NormalizedOptions) => T) => T | Promise<T>;
 
 export interface ExtendOptions extends Options {
 	handlers?: HandlerFunction[];
@@ -79,7 +65,7 @@ type Except<ObjectType, KeysType extends keyof ObjectType> = Pick<ObjectType, Ex
 export type OptionsOfTextResponseBody = Options & {isStream?: false; resolveBodyOnly?: false; responseType?: 'text'};
 export type OptionsOfJSONResponseBody = Options & {isStream?: false; resolveBodyOnly?: false; responseType: 'json'};
 export type OptionsOfBufferResponseBody = Options & {isStream?: false; resolveBodyOnly?: false; responseType: 'buffer'};
-export type GotStrictOptions = Except<Options, 'isStream' | 'responseType' | 'resolveBodyOnly'>;
+export type StrictOptions = Except<Options, 'isStream' | 'responseType' | 'resolveBodyOnly'>;
 type ResponseBodyOnly = {resolveBodyOnly: true};
 
 export interface GotPaginate {
@@ -124,6 +110,28 @@ export interface GotRequest {
 	(options: Options): CancelableRequest | Request;
 }
 
+export type HTTPAlias =
+	| 'get'
+	| 'post'
+	| 'put'
+	| 'patch'
+	| 'head'
+	| 'delete';
+
+const aliases: readonly HTTPAlias[] = [
+	'get',
+	'post',
+	'put',
+	'patch',
+	'head',
+	'delete'
+];
+
+interface GotStreamFunction {
+	(url: string | URL, options?: Options & {isStream?: true}): Request;
+	(options?: Options & {isStream?: true}): Request;
+}
+
 export type GotStream = GotStreamFunction & Record<HTTPAlias, GotStreamFunction>;
 
 export interface Got extends Record<HTTPAlias, GotRequest>, GotRequest {
@@ -143,15 +151,6 @@ export interface Got extends Record<HTTPAlias, GotRequest>, GotRequest {
 	mergeInstances(parent: Got, ...instances: Got[]): Got;
 	mergeOptions(...sources: Options[]): NormalizedOptions;
 }
-
-const aliases: readonly HTTPAlias[] = [
-	'get',
-	'post',
-	'put',
-	'patch',
-	'head',
-	'delete'
-];
 
 export const defaultHandler: HandlerFunction = (options, next) => next(options);
 

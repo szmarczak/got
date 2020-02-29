@@ -3,7 +3,7 @@ import {parse, URL, URLSearchParams} from 'url';
 import test from 'ava';
 import {Handler} from 'express';
 import pEvent = require('p-event');
-import got from '../source';
+import got, {StrictOptions} from '../source';
 import withServer from './helpers/with-server';
 
 const echoUrl: Handler = (request, response) => {
@@ -406,6 +406,16 @@ test('fallbacks to native http if `request(...)` returns undefined', withServer,
 	server.get('/', echoUrl);
 
 	const {body} = await got('', {request: () => undefined});
+
+	t.is(body, '/');
+});
+
+test('strict options', withServer, async (t, server, got) => {
+	server.get('/', echoUrl);
+
+	const options: StrictOptions = {};
+
+	const {body} = await got(options);
 
 	t.is(body, '/');
 });
