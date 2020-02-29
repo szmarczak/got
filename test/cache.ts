@@ -196,3 +196,17 @@ test('`isFromCache` stream property is true if the response was cached', withSer
 
 	await getStream(stream);
 });
+
+test('does not break POST requests', withServer, async (t, server, got) => {
+	server.post('/', async (request, response) => {
+		request.resume();
+		response.end(JSON.stringify(request.headers));
+	});
+
+	const headers = await got.post('', {
+		body: '',
+		cache: new Map()
+	}).json<{'content-length': string}>();
+
+	t.is(headers['content-length'], '0');
+});
