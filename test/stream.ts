@@ -322,11 +322,11 @@ test('no unhandled body stream errors', async t => {
 
 test('works with pipeline', async t => {
 	await t.throwsAsync(pStreamPipeline(
-        new stream.Readable({
-			read: function () {
+		new stream.Readable({
+			read() {
 				this.push(null);
 			}
 		}),
-        got.stream.put('http://localhost:7777')
-    ), {message: 'connect ECONNREFUSED 127.0.0.1:7777'});
+		got.stream.put('http://localhost:7777')
+	), {message: 'connect ECONNREFUSED 127.0.0.1:7777'});
 });
