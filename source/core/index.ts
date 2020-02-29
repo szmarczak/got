@@ -1013,11 +1013,20 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				const redirectString = redirectUrl.toString();
 				decodeURI(redirectString);
 
-				// Redirecting to a different site, clear cookies.
-				if (redirectUrl.hostname !== url.hostname && 'cookie' in options.headers) {
-					delete options.headers.cookie;
-					delete options.username;
-					delete options.password;
+				// Redirecting to a different site, clear sensitive data.
+				if (redirectUrl.hostname !== url.hostname) {
+					if ('cookie' in options.headers) {
+						delete options.headers.cookie;
+					}
+
+					if ('authorization' in options.headers) {
+						delete options.headers.authorization;
+					}
+
+					if (options.username || options.password) {
+						delete options.username;
+						delete options.password;
+					}
 				}
 
 				this.redirects.push(redirectString);

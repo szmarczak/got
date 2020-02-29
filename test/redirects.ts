@@ -401,3 +401,34 @@ test('method rewriting can be turned off', withServer, async (t, server, got) =>
 
 	t.is(body, '');
 });
+
+test('clears username and password when redirecting to a different hostname', withServer, async (t, server, got) => {
+	server.get('/', (_request, response) => {
+		response.writeHead(302, {
+			location: 'https://httpbin.org/anything'
+		});
+		response.end();
+	});
+
+	const {headers} = await got('', {
+		username: 'hello',
+		password: 'world'
+	}).json();
+	t.is(headers.Authorization, undefined);
+});
+
+test('clears the authorization header when redirecting to a different hostname', withServer, async (t, server, got) => {
+	server.get('/', (_request, response) => {
+		response.writeHead(302, {
+			location: 'https://httpbin.org/anything'
+		});
+		response.end();
+	});
+
+	const {headers} = await got('', {
+		headers: {
+			authorization: 'Basic aGVsbG86d29ybGQ='
+		}
+	}).json();
+	t.is(headers.Authorization, undefined);
+});
