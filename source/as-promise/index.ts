@@ -12,7 +12,7 @@ import {
 	ParseError
 } from './types';
 import PromisableRequest, {parseBody} from './core';
-import proxyEvents from '../utils/proxy-events';
+import proxyEvents from '../core/utils/proxy-events';
 
 export default function asPromise<T>(options: NormalizedOptions): CancelableRequest<T> {
 	let retryCount = 0;

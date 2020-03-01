@@ -17,11 +17,12 @@ import lowercaseKeys = require('lowercase-keys');
 import ResponseLike = require('responselike');
 import getStream = require('get-stream');
 import is, {assert} from '@sindresorhus/is';
-import getBodySize from '../utils/get-body-size';
-import isFormData from '../utils/is-form-data';
-import proxyEvents from '../utils/proxy-events';
-import timedOut, {Delays, TimeoutError as TimedOutTimeoutError} from '../utils/timed-out';
-import urlToOptions from '../utils/url-to-options';
+import getBodySize from './utils/get-body-size';
+import isFormData from './utils/is-form-data';
+import proxyEvents from './utils/proxy-events';
+import timedOut, {Delays, TimeoutError as TimedOutTimeoutError} from './utils/timed-out';
+import urlToOptions from './utils/url-to-options';
+import optionsToUrl, {URLOptions} from './utils/options-to-url';
 
 type HttpRequestFunction = typeof httpRequest;
 type Error = NodeJS.ErrnoException;
@@ -104,7 +105,7 @@ export type RequestFunction = (url: URL, options: RequestOptions, callback?: (re
 
 export type Headers = Record<string, string | string[] | undefined>;
 
-export interface Options extends SecureContextOptions {
+export interface Options extends URLOptions, SecureContextOptions {
 	request?: RequestFunction;
 	agent?: Agents | false;
 	decompress?: boolean;
@@ -577,19 +578,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			}
 		}
 
-		// Disallow `options.path` and `options.pathname`
-		if (
-			'path' in options ||
-			'pathname' in options ||
-			'hostname' in options ||
-			'host' in options ||
-			'port' in options ||
-			'search' in options ||
-			'protocol' in options ||
-			'auth' in options
-		) {
-			throw new TypeError('The legacy `url.Url` has been deprecated. Use `URL` instead.');
-		}
+		// TODO: Deprecate URL options in Got 12.
 
 		// Verify types
 		if (is.null_(options.encoding)) {
@@ -629,6 +618,16 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			options.headers = lowercaseKeys({...(defaults?.headers), ...options.headers});
 		}
 
+		// Disallow legacy `url.Url`
+		if ('slashes' in options) {
+			throw new TypeError('The legacy `url.Url` has been deprecated. Use `URL` instead.');
+		}
+
+		// `options.auth`
+		if ('auth' in options) {
+			throw new TypeError('Parameter `auth` is deprecated. Use `username` / `password` instead.');
+		}
+
 		// `options.prefixUrl` & `options.url`
 		if (options.prefixUrl) {
 			options.prefixUrl = options.prefixUrl.toString();
@@ -645,9 +644,9 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 				throw new Error('`input` must not start with a slash when using `prefixUrl`');
 			}
 
-			options.url = new URL(options.prefixUrl + options.url);
-		} else if (is.undefined(options.url) && options.prefixUrl !== '') {
-			options.url = new URL(options.prefixUrl);
+			options.url = optionsToUrl(options.prefixUrl + options.url, options as Options & {searchParams?: URLSearchParams});
+		} else if ((is.undefined(options.url) && options.prefixUrl !== '') || options.protocol) {
+			options.url = optionsToUrl(options.prefixUrl, options as Options & {searchParams?: URLSearchParams});
 		}
 
 		if (options.url) {

@@ -11,7 +11,7 @@ import CacheableLookup from 'cacheable-lookup';
 import {Handler} from 'express';
 import pEvent = require('p-event');
 import got, {TimeoutError} from '../source';
-import timedOut from '../source/utils/timed-out';
+import timedOut from '../source/core/utils/timed-out';
 import slowDataStream from './helpers/slow-data-stream';
 import {GlobalClock} from './helpers/types';
 import withServer, {withServerAndLolex} from './helpers/with-server';

@@ -23,7 +23,7 @@ test('`url` is required', async t => {
 			url: ''
 		}),
 		{
-			message: 'Invalid URL: '
+			message: 'No URL protocol specified'
 		}
 	);
 });
@@ -89,7 +89,7 @@ test('methods are normalized', withServer, async (t, server, got) => {
 	await instance('test', {method: 'post'});
 });
 
-test('throws an error when legacy URL is passed', withServer, async (t, server, got) => {
+test.failing('throws an error when legacy URL is passed', withServer, async (t, server, got) => {
 	server.get('/test', echoUrl);
 
 	await t.throwsAsync(
@@ -97,6 +97,28 @@ test('throws an error when legacy URL is passed', withServer, async (t, server, 
 		got(parse(`${server.url}/test`)),
 		{message: 'The legacy `url.Url` has been deprecated. Use `URL` instead.'}
 	);
+
+	await t.throwsAsync(
+		got({
+			protocol: 'http:',
+			hostname: 'localhost',
+			port: server.port
+		}),
+		{message: 'The legacy `url.Url` has been deprecated. Use `URL` instead.'}
+	);
+});
+
+test('accepts legacy URL options', withServer, async (t, server, got) => {
+	server.get('/test', echoUrl);
+
+	const {body: secondBody} = await got({
+		protocol: 'http:',
+		hostname: 'localhost',
+		port: server.port,
+		pathname: '/test'
+	});
+
+	t.is(secondBody, '/test');
 });
 
 test('overrides `searchParams` from options', withServer, async (t, server, got) => {
@@ -376,7 +398,7 @@ test('throws a helpful error when passing `auth`', async t => {
 		// @ts-ignore For testing purposes
 		auth: 'username:password'
 	}), {
-		message: 'The legacy `url.Url` has been deprecated. Use `URL` instead.'
+		message: 'Parameter `auth` is deprecated. Use `username` / `password` instead.'
 	});
 });
 
