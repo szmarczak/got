@@ -94,7 +94,7 @@ test.failing('throws an error when legacy URL is passed', withServer, async (t, 
 
 	await t.throwsAsync(
 		// @ts-ignore Error tests
-		got(parse(`${server.url}/test`)),
+		got(parse(`${server.url}/test`), {prefixUrl: ''}),
 		{message: 'The legacy `url.Url` has been deprecated. Use `URL` instead.'}
 	);
 
@@ -102,7 +102,8 @@ test.failing('throws an error when legacy URL is passed', withServer, async (t, 
 		got({
 			protocol: 'http:',
 			hostname: 'localhost',
-			port: server.port
+			port: server.port,
+			prefixUrl: ''
 		}),
 		{message: 'The legacy `url.Url` has been deprecated. Use `URL` instead.'}
 	);
@@ -115,7 +116,8 @@ test('accepts legacy URL options', withServer, async (t, server, got) => {
 		protocol: 'http:',
 		hostname: 'localhost',
 		port: server.port,
-		pathname: '/test'
+		pathname: '/test',
+		prefixUrl: ''
 	});
 
 	t.is(secondBody, '/test');
