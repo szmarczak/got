@@ -1,16 +1,14 @@
 import {URL} from 'url';
 import {CancelError} from 'p-cancelable';
+import is from '@sindresorhus/is/dist';
 import asPromise, {
 	// Request & Response
 	PromisableRequest,
-	CancelableRequest,
 	Response,
 
 	// Options
 	Options,
 	NormalizedOptions,
-	Defaults as DefaultOptions,
-	PaginationOptions,
 
 	// Hooks
 	InitHook,
@@ -26,17 +24,20 @@ import asPromise, {
 	UnsupportedProtocolError,
 	UploadError
 } from './as-promise';
+import {
+	GotReturn,
+	ExtendOptions,
+	Got,
+	HTTPAlias,
+	HandlerFunction,
+	InstanceDefaults,
+	GotPaginate,
+	GotStream,
+	GotRequest
+} from './types';
 import createRejection from './as-promise/create-rejection';
 import Request, {kIsNormalizedAlready} from './core';
 import deepFreeze from './utils/deep-freeze';
-import is from '@sindresorhus/is/dist';
-
-export interface InstanceDefaults {
-	options: DefaultOptions;
-	handlers: HandlerFunction[];
-	mutableDefaults: boolean;
-	_rawHandlers?: HandlerFunction[];
-}
 
 const errors = {
 	RequestError,
@@ -51,79 +52,13 @@ const errors = {
 	UploadError
 };
 
-const {normalizeArguments} = PromisableRequest;
-
-export type GotReturn = Request | CancelableRequest;
-export type HandlerFunction = <T extends GotReturn>(options: NormalizedOptions, next: (options: NormalizedOptions) => T) => T | Promise<T>;
+const {normalizeArguments, mergeOptions} = PromisableRequest;
 
 const getPromiseOrStream = (options: NormalizedOptions): GotReturn => options.isStream ? new Request(options.url, options) : asPromise(options);
-
-export interface ExtendOptions extends Options {
-	handlers?: HandlerFunction[];
-	mutableDefaults?: boolean;
-}
 
 const isGotInstance = (value: Got | ExtendOptions): value is Got => (
 	'defaults' in value && 'options' in value.defaults
 );
-
-type Except<ObjectType, KeysType extends keyof ObjectType> = Pick<ObjectType, Exclude<keyof ObjectType, KeysType>>;
-
-export type OptionsOfTextResponseBody = Options & {isStream?: false; resolveBodyOnly?: false; responseType?: 'text'};
-export type OptionsOfJSONResponseBody = Options & {isStream?: false; resolveBodyOnly?: false; responseType: 'json'};
-export type OptionsOfBufferResponseBody = Options & {isStream?: false; resolveBodyOnly?: false; responseType: 'buffer'};
-export type StrictOptions = Except<Options, 'isStream' | 'responseType' | 'resolveBodyOnly'>;
-type ResponseBodyOnly = {resolveBodyOnly: true};
-
-export interface GotPaginate {
-	<T>(url: string | URL, options?: Options & PaginationOptions<T>): AsyncIterableIterator<T>;
-	all<T>(url: string | URL, options?: Options & PaginationOptions<T>): Promise<T[]>;
-
-	// A bug.
-	// eslint-disable-next-line @typescript-eslint/adjacent-overload-signatures
-	<T>(options?: Options & PaginationOptions<T>): AsyncIterableIterator<T>;
-	// A bug.
-	// eslint-disable-next-line @typescript-eslint/adjacent-overload-signatures
-	all<T>(options?: Options & PaginationOptions<T>): Promise<T[]>;
-}
-
-export interface GotRequest {
-	// `asPromise` usage
-	(url: string | URL, options?: OptionsOfTextResponseBody): CancelableRequest<Response<string>>;
-	<T>(url: string | URL, options?: OptionsOfJSONResponseBody): CancelableRequest<Response<T>>;
-	(url: string | URL, options?: OptionsOfBufferResponseBody): CancelableRequest<Response<Buffer>>;
-
-	(options: OptionsOfTextResponseBody): CancelableRequest<Response<string>>;
-	<T>(options: OptionsOfJSONResponseBody): CancelableRequest<Response<T>>;
-	(options: OptionsOfBufferResponseBody): CancelableRequest<Response<Buffer>>;
-
-	// `resolveBodyOnly` usage
-	(url: string | URL, options?: (OptionsOfTextResponseBody & ResponseBodyOnly)): CancelableRequest<string>;
-	<T>(url: string | URL, options?: (OptionsOfJSONResponseBody & ResponseBodyOnly)): CancelableRequest<T>;
-	(url: string | URL, options?: (OptionsOfBufferResponseBody & ResponseBodyOnly)): CancelableRequest<Buffer>;
-
-	(options: (OptionsOfTextResponseBody & ResponseBodyOnly)): CancelableRequest<string>;
-	<T>(options: (OptionsOfJSONResponseBody & ResponseBodyOnly)): CancelableRequest<T>;
-	(options: (OptionsOfBufferResponseBody & ResponseBodyOnly)): CancelableRequest<Buffer>;
-
-	// `asStream` usage
-	(url: string | URL, options?: Options & {isStream: true}): Request;
-
-	(options: Options & {isStream: true}): Request;
-
-	// Fallback
-	(url: string | URL, options?: Options): CancelableRequest | Request;
-
-	(options: Options): CancelableRequest | Request;
-}
-
-export type HTTPAlias =
-	| 'get'
-	| 'post'
-	| 'put'
-	| 'patch'
-	| 'head'
-	| 'delete';
 
 const aliases: readonly HTTPAlias[] = [
 	'get',
@@ -134,42 +69,7 @@ const aliases: readonly HTTPAlias[] = [
 	'delete'
 ];
 
-interface GotStreamFunction {
-	(url: string | URL, options?: Options & {isStream?: true}): Request;
-	(options?: Options & {isStream?: true}): Request;
-}
-
-export type GotStream = GotStreamFunction & Record<HTTPAlias, GotStreamFunction>;
-
-export interface Got extends Record<HTTPAlias, GotRequest>, GotRequest {
-	stream: GotStream;
-	paginate: GotPaginate;
-	defaults: InstanceDefaults;
-	CacheError: typeof CacheError;
-	RequestError: typeof RequestError;
-	ReadError: typeof ReadError;
-	ParseError: typeof ParseError;
-	HTTPError: typeof HTTPError;
-	MaxRedirectsError: typeof MaxRedirectsError;
-	TimeoutError: typeof TimeoutError;
-	CancelError: typeof CancelError;
-
-	extend(...instancesOrOptions: Array<Got | ExtendOptions>): Got;
-	mergeInstances(parent: Got, ...instances: Got[]): Got;
-	mergeOptions(...sources: Options[]): NormalizedOptions;
-}
-
 export const defaultHandler: HandlerFunction = (options, next) => next(options);
-
-export const mergeOptions = (...sources: Options[]): NormalizedOptions => {
-	let mergedOptions: NormalizedOptions | undefined;
-
-	for (const source of sources) {
-		mergedOptions = normalizeArguments(undefined, source, mergedOptions);
-	}
-
-	return mergedOptions!;
-};
 
 const callInitHooks = (hooks: InitHook[] | undefined, options: Options): void => {
 	if (hooks) {
@@ -371,3 +271,4 @@ const create = (defaults: InstanceDefaults): Got => {
 };
 
 export default create;
+export * from './types';

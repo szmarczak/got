@@ -111,6 +111,16 @@ export default class PromisableRequest extends Request {
 		return options;
 	}
 
+	static mergeOptions(...sources: Options[]): NormalizedOptions {
+		let mergedOptions: NormalizedOptions | undefined;
+
+		for (const source of sources) {
+			mergedOptions = PromisableRequest.normalizeArguments(undefined, source, mergedOptions);
+		}
+
+		return mergedOptions!;
+	}
+
 	async _beforeError(error: RequestError): Promise<void> {
 		const isHTTPError = error instanceof HTTPError;
 
