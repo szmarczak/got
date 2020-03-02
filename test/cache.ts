@@ -197,6 +197,23 @@ test('`isFromCache` stream property is true if the response was cached', withSer
 	await getStream(stream);
 });
 
+test('can disable cache by extending the instance', withServer, async (t, server, got) => {
+	server.get('/', cacheEndpoint);
+
+	const cache = new Map();
+
+	const instance = got.extend({cache});
+
+	await getStream(instance.stream(''));
+	const stream = instance.extend({cache: false}).stream('');
+
+	const response: Response = await pEvent(stream, 'response');
+	t.is(response.isFromCache, true);
+	t.is(stream.isFromCache, false);
+
+	await getStream(stream);
+});
+
 test('does not break POST requests', withServer, async (t, server, got) => {
 	server.post('/', async (request, response) => {
 		request.resume();

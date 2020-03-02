@@ -124,7 +124,7 @@ export interface Options extends URLOptions, SecureContextOptions {
 	hooks?: Hooks;
 	followRedirect?: boolean;
 	maxRedirects?: number;
-	cache?: string | CacheableRequest.StorageAdapter | false;
+	cache?: string | CacheableRequest.StorageAdapter;
 	throwHttpErrors?: boolean;
 	username?: string;
 	password?: string;
@@ -595,6 +595,12 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			throw new TypeError('To get a Buffer, set `options.responseType` to `buffer` instead');
 		}
 
+		// Support extend-specific options
+		if ((options.cache as unknown as boolean) === false) {
+			options.cache = undefined;
+		}
+
+		// Nice type assertions
 		assert.any([is.string, is.undefined], options.method);
 		assert.any([is.object, is.undefined], options.headers);
 		assert.any([is.string, is.urlInstance, is.undefined], options.prefixUrl);

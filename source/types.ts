@@ -22,6 +22,8 @@ import {
 } from './as-promise';
 import Request from './core';
 
+type Except<ObjectType, KeysType extends keyof ObjectType> = Pick<ObjectType, Exclude<keyof ObjectType, KeysType>>;
+
 export interface InstanceDefaults {
 	options: DefaultOptions;
 	handlers: HandlerFunction[];
@@ -32,12 +34,11 @@ export interface InstanceDefaults {
 export type GotReturn = Request | CancelableRequest;
 export type HandlerFunction = <T extends GotReturn>(options: NormalizedOptions, next: (options: NormalizedOptions) => T) => T | Promise<T>;
 
-export interface ExtendOptions extends Options {
+export interface ExtendOptions extends Except<Options, 'cache'> {
 	handlers?: HandlerFunction[];
 	mutableDefaults?: boolean;
+	cache?: Options['cache'] | false;
 }
-
-type Except<ObjectType, KeysType extends keyof ObjectType> = Pick<ObjectType, Exclude<keyof ObjectType, KeysType>>;
 
 export type OptionsOfTextResponseBody = Options & {isStream?: false; resolveBodyOnly?: false; responseType?: 'text'};
 export type OptionsOfJSONResponseBody = Options & {isStream?: false; resolveBodyOnly?: false; responseType: 'json'};
