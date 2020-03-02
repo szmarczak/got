@@ -39,8 +39,6 @@ const axiosOptions = {
 	rejectUnauthorized: false
 };
 
-fetchOptions;requestOptions;got;fetch;request;
-
 const axiosStreamOptions: typeof axiosOptions & {responseType: 'stream'} = {
 	...axiosOptions,
 	responseType: 'stream'
