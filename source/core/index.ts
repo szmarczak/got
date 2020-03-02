@@ -442,6 +442,16 @@ export class UnsupportedProtocolError extends RequestError {
 	}
 }
 
+const proxiedRequestEvents = [
+	'socket',
+	'abort',
+	'connect',
+	'continue',
+	'information',
+	'upgrade',
+	'timeout'
+];
+
 export default class Request extends Duplex implements RequestEvents<Request> {
 	['constructor']: typeof Request;
 
@@ -1114,15 +1124,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			this._beforeError(error as RequestError);
 		});
 
-		this[kUnproxyEvents] = proxyEvents(request, this, [
-			'socket',
-			'abort',
-			'connect',
-			'continue',
-			'information',
-			'upgrade',
-			'timeout'
-		]);
+		this[kUnproxyEvents] = proxyEvents(request, this, proxiedRequestEvents);
 
 		this[kRequest] = request;
 
