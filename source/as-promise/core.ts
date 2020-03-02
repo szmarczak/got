@@ -6,7 +6,7 @@ import {
 	Defaults,
 	ResponseType
 } from './types';
-import Request, {knownHookEvents, RequestError, HTTPError} from '../core';
+import Request, {knownHookEvents, RequestError, HTTPError, Method} from '../core';
 
 if (!knownHookEvents.includes('beforeRetry' as any)) {
 	knownHookEvents.push('beforeRetry' as any, 'afterResponse' as any);
@@ -66,6 +66,10 @@ export default class PromisableRequest extends Request {
 				...options.retry,
 				...retry
 			};
+
+			options.retry.methods = [...new Set(options.retry.methods!.map(method => method.toUpperCase() as Method))];
+			options.retry.statusCodes = [...new Set(options.retry.statusCodes)];
+			options.retry.errorCodes = [...new Set(options.retry.errorCodes)];
 		} else if (is.number(retry)) {
 			options.retry.limit = retry;
 		}
