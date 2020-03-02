@@ -34,10 +34,9 @@ export interface InstanceDefaults {
 export type GotReturn = Request | CancelableRequest;
 export type HandlerFunction = <T extends GotReturn>(options: NormalizedOptions, next: (options: NormalizedOptions) => T) => T | Promise<T>;
 
-export interface ExtendOptions extends Except<Options, 'cache'> {
+export interface ExtendOptions extends Options {
 	handlers?: HandlerFunction[];
 	mutableDefaults?: boolean;
-	cache?: Options['cache'] | false;
 }
 
 export type OptionsOfTextResponseBody = Options & {isStream?: false; resolveBodyOnly?: false; responseType?: 'text'};
