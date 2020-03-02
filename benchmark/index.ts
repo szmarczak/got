@@ -47,6 +47,11 @@ const axiosStreamOptions: typeof axiosOptions & {responseType: 'stream'} = {
 	responseType: 'stream'
 };
 
+const httpsOptions = {
+	rejectUnauthorized: false,
+	agent: httpsAgent
+};
+
 const suite = new Benchmark.Suite();
 
 // Benchmarking
@@ -132,6 +137,16 @@ suite.add('got - promise', {
 			deferred.resolve();
 		});
 	}
+}).add('https - stream', {
+	defer: true,
+	fn: (deferred: {resolve(): void}) => {
+		https.request(urlString, httpsOptions, response => {
+			response.resume();
+			response.once('end', () => {
+				deferred.resolve();
+			});
+		}).end();
+	}
 }).on('cycle', (event: Benchmark.Event) => {
 	console.log(String(event.target));
 }).on('complete', function (this: any) {
@@ -140,7 +155,7 @@ suite.add('got - promise', {
 	internalBenchmark();
 }).run();
 
-const internalBenchmark = () => {
+const internalBenchmark = (): void => {
 	console.log();
 
 	const internalSuite = new Benchmark.Suite();
@@ -156,16 +171,17 @@ const internalBenchmark = () => {
 };
 
 // Results (i7-7700k, CPU governor: performance):
-// got - promise        x 2,996 ops/sec ±5.62%  (67 runs sampled)
-// got - stream         x 4,603 ops/sec ±4.93%  (77 runs sampled)
-// got - promise core   x 5,643 ops/sec ±4.81%  (76 runs sampled)
-// got - stream core    x 5,922 ops/sec ±1.89%  (83 runs sampled)
-// request - callback   x 6,297 ops/sec ±11.26% (68 runs sampled)
-// request - stream     x 8,035 ops/sec ±3.16%  (81 runs sampled)
-// node-fetch - promise x 6,662 ops/sec ±7.74%  (73 runs sampled)
-// node-fetch - stream  x 7,949 ops/sec ±4.60%  (80 runs sampled)
-// axios - promise      x 6,308 ops/sec ±7.81%  (78 runs sampled)
-// axios - stream       x 8,322 ops/sec ±4.15%  (79 runs sampled)
-// Fastest is axios - stream
+// got - promise x 2,875 ops/sec ±5.64% (73 runs sampled)
+// got - stream x 3,947 ops/sec ±6.51% (69 runs sampled)
+// got - promise core x 5,198 ops/sec ±4.51% (73 runs sampled)
+// got - stream core x 5,665 ops/sec ±3.28% (81 runs sampled)
+// request - callback x 6,839 ops/sec ±7.83% (74 runs sampled)
+// request - stream x 7,579 ops/sec ±6.19% (75 runs sampled)
+// node-fetch - promise x 6,950 ops/sec ±5.76% (73 runs sampled)
+// node-fetch - stream x 7,370 ops/sec ±4.78% (77 runs sampled)
+// axios - promise x 5,978 ops/sec ±6.65% (72 runs sampled)
+// axios - stream x 8,434 ops/sec ±6.12% (84 runs sampled)
+// https - stream x 10,222 ops/sec ±7.38% (76 runs sampled)
+// Fastest is https - stream
 
-// got - normalize options x 145,450 ops/sec ±0.84% (92 runs sampled)
+// got - normalize options x 142,407 ops/sec ±0.73% (95 runs sampled)
