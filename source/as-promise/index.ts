@@ -14,6 +14,14 @@ import {
 import PromisableRequest, {parseBody} from './core';
 import proxyEvents from '../core/utils/proxy-events';
 
+const proxiedRequestEvents = [
+	'request',
+	'response',
+	'redirect',
+	'uploadProgress',
+	'downloadProgress'
+];
+
 export default function asPromise<T>(options: NormalizedOptions): CancelableRequest<T> {
 	let retryCount = 0;
 	let body: Buffer;
@@ -196,13 +204,7 @@ export default function asPromise<T>(options: NormalizedOptions): CancelableRequ
 				reject(error);
 			});
 
-			proxyEvents(request, emitter, [
-				'request',
-				'response',
-				'redirect',
-				'uploadProgress',
-				'downloadProgress'
-			]);
+			proxyEvents(request, emitter, proxiedRequestEvents);
 		};
 
 		makeRequest();
