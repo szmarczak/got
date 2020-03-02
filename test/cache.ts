@@ -208,7 +208,7 @@ test('can disable cache by extending the instance', withServer, async (t, server
 	const stream = instance.extend({cache: false}).stream('');
 
 	const response: Response = await pEvent(stream, 'response');
-	t.is(response.isFromCache, true);
+	t.is(response.isFromCache, false);
 	t.is(stream.isFromCache, false);
 
 	await getStream(stream);
