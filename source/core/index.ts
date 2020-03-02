@@ -598,7 +598,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		}
 
 		// Support extend-specific options
-		if ((options.cache as unknown as boolean) === false) {
+		if (options.cache === false) {
 			options.cache = undefined;
 		}
 

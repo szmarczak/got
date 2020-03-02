@@ -67,7 +67,7 @@ export default class PromisableRequest extends Request {
 				...retry
 			};
 
-			options.retry.methods = [...new Set(options.retry.methods!.map(method => method.toUpperCase() as Method))];
+			options.retry.methods = [...new Set(options.retry.methods.map(method => method.toUpperCase() as Method))];
 			options.retry.statusCodes = [...new Set(options.retry.statusCodes)];
 			options.retry.errorCodes = [...new Set(options.retry.errorCodes)];
 		} else if (is.number(retry)) {
