@@ -124,7 +124,7 @@ export interface Options extends URLOptions, SecureContextOptions {
 	hooks?: Hooks;
 	followRedirect?: boolean;
 	maxRedirects?: number;
-	cache?: string | CacheableRequest.StorageAdapter;
+	cache?: string | CacheableRequest.StorageAdapter | false;
 	throwHttpErrors?: boolean;
 	username?: string;
 	password?: string;

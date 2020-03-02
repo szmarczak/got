@@ -1,6 +1,7 @@
 import {URL} from 'url';
 import {Response, Options} from './as-promise';
 import create, {defaultHandler, InstanceDefaults} from './create';
+import CacheableLookup from 'cacheable-lookup';
 
 const defaults: InstanceDefaults = {
 	options: {
@@ -52,6 +53,8 @@ const defaults: InstanceDefaults = {
 			beforeError: [],
 			afterResponse: []
 		},
+		cache: undefined,
+		dnsCache: new CacheableLookup(),
 		decompress: true,
 		throwHttpErrors: true,
 		followRedirect: true,
