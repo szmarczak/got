@@ -7,7 +7,7 @@ import {SecureContextOptions} from 'tls';
 import http = require('http');
 import {ClientRequest, RequestOptions, IncomingMessage, ServerResponse, request as httpRequest} from 'http';
 import https = require('https');
-import timer, {ClientRequestWithTimings, Timings} from '@szmarczak/http-timer';
+import timer, {ClientRequestWithTimings, Timings, IncomingMessageWithTimings} from '@szmarczak/http-timer';
 import decompressResponse = require('decompress-response');
 import CacheableLookup from 'cacheable-lookup';
 import CacheableRequest = require('cacheable-request');
@@ -205,7 +205,7 @@ export interface Progress {
 	total?: number;
 }
 
-export interface PlainResponse extends IncomingMessage {
+export interface PlainResponse extends IncomingMessageWithTimings {
 	requestUrl: string;
 	redirectUrls: string[];
 	request: Request;
@@ -213,6 +213,7 @@ export interface PlainResponse extends IncomingMessage {
 	isFromCache: boolean;
 	statusCode: number;
 	url: string;
+	timings: Timings;
 }
 
 // For Promise support

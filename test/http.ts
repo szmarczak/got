@@ -149,3 +149,14 @@ test('socket destroyed by the server throws ECONNRESET', withServer, async (t, s
 		code: 'ECONNRESET'
 	});
 });
+
+test('the response contains timings property', withServer, async (t, server, got) => {
+	server.get('/', (_request, response) => {
+		response.end('ok');
+	});
+
+	const {timings} = await got('');
+
+	t.truthy(timings);
+	t.true(timings.phases.total! >= 0);
+});
