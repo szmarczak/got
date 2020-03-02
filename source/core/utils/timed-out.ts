@@ -42,16 +42,9 @@ export class TimeoutError extends Error {
 	}
 }
 
-export default (request: ClientRequest, delaysOrNumber: Delays | number, options: TimedOutOptions): () => void => {
+export default (request: ClientRequest, delays: Delays, options: TimedOutOptions): () => void => {
 	if (reentry in request) {
 		return noop;
-	}
-
-	let delays: Delays;
-	if (typeof delaysOrNumber === 'number') {
-		delays = {request: delaysOrNumber};
-	} else {
-		delays = delaysOrNumber;
 	}
 
 	request[reentry] = true;
