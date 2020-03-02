@@ -124,7 +124,7 @@ export interface Options extends URLOptions, SecureContextOptions {
 	hooks?: Hooks;
 	followRedirect?: boolean;
 	maxRedirects?: number;
-	cache?: string | CacheableRequest.StorageAdapter;
+	cache?: string | CacheableRequest.StorageAdapter | false;
 	throwHttpErrors?: boolean;
 	username?: string;
 	password?: string;
@@ -156,6 +156,7 @@ export interface NormalizedOptions extends Options {
 	hooks: Required<Hooks>;
 	followRedirect: boolean;
 	maxRedirects: number;
+	cache?: string | CacheableRequest.StorageAdapter;
 	throwHttpErrors: boolean;
 	dnsCache?: CacheableLookup;
 	cacheableRequest?: (options: string | URL | http.RequestOptions, callback?: (response: http.ServerResponse | ResponseLike) => void) => CacheableRequest.Emitter;
