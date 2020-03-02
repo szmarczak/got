@@ -813,14 +813,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 			}
 		}
 
-		options.decompress = Boolean(options.decompress);
-		options.ignoreInvalidCookies = Boolean(options.ignoreInvalidCookies);
-		options.followRedirect = Boolean(options.followRedirect);
 		options.maxRedirects = options.maxRedirects ?? 0;
-		options.throwHttpErrors = Boolean(options.throwHttpErrors);
-		options.http2 = Boolean(options.http2);
-		options.allowGetBody = Boolean(options.allowGetBody);
-		options.rejectUnauthorized = Boolean(options.rejectUnauthorized);
 
 		// Set non-enumerable properties
 		setNonEnumerableProperties([defaults, options], options);

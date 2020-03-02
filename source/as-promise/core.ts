@@ -45,10 +45,6 @@ export default class PromisableRequest extends Request {
 		assert.any([is.boolean, is.undefined], options.methodRewriting);
 		assert.any([is.boolean, is.undefined], options.isStream);
 
-		options.resolveBodyOnly = Boolean(options.resolveBodyOnly);
-		options.methodRewriting = Boolean(options.methodRewriting);
-		options.isStream = Boolean(options.isStream);
-
 		// `options.retry`
 		const {retry} = options;
 
