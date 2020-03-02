@@ -756,15 +756,13 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 		// `options.timeout`
 		if (is.number(options.timeout)) {
 			options.timeout = {request: options.timeout};
-		} else {
-			options.timeout = {...options.timeout};
-		}
-
-		if (defaults) {
+		} else if (defaults) {
 			options.timeout = {
 				...defaults.timeout,
 				...options.timeout
 			};
+		} else {
+			options.timeout = {...options.timeout};
 		}
 
 		// `options.context`
@@ -777,7 +775,7 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		for (const event of knownHookEvents) {
 			if (event in options.hooks) {
-				if (Array.isArray(options.hooks[event])) {
+				if (is.array(options.hooks[event])) {
 					// See https://github.com/microsoft/TypeScript/issues/31445#issuecomment-576929044
 					(options.hooks as any)[event] = [...options.hooks[event]!];
 				} else {
@@ -790,11 +788,15 @@ export default class Request extends Duplex implements RequestEvents<Request> {
 
 		if (defaults) {
 			for (const event of knownHookEvents) {
-				// See https://github.com/microsoft/TypeScript/issues/31445#issuecomment-576929044
-				(options.hooks as any)[event] = [
-					...defaults.hooks[event],
-					...options.hooks[event]!
-				];
+				const defaultHooks = defaults.hooks[event];
+
+				if (defaultHooks.length !== 0) {
+					// See https://github.com/microsoft/TypeScript/issues/31445#issuecomment-576929044
+					(options.hooks as any)[event] = [
+						...defaults.hooks[event],
+						...options.hooks[event]!
+					];
+				}
 			}
 		}
 
