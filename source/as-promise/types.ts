@@ -34,10 +34,13 @@ import {
 	Method,
 	RequestEvents
 } from '../core';
+import PromisableRequest from './core';
 
 export type ResponseType = 'json' | 'buffer' | 'text';
 
-export type Response<T = unknown> = RequestResponse<T>;
+export interface Response<T = unknown> extends RequestResponse<T> {
+	request: PromisableRequest;
+}
 
 export interface RetryObject {
 	attemptCount: number;
