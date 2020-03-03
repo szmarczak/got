@@ -225,8 +225,8 @@ export interface Response<T = unknown> extends PlainResponse {
 
 export interface RequestEvents<T> {
 	on(name: 'request', listener: (request: http.ClientRequest) => void): T;
-	on(name: 'response', listener: (response: Response) => void): T;
-	on(name: 'redirect', listener: (response: Response, nextOptions: NormalizedOptions) => void): T;
+	on<R extends Response>(name: 'response', listener: (response: R) => void): T;
+	on<R extends Response, N extends NormalizedOptions>(name: 'redirect', listener: (response: R, nextOptions: N) => void): T;
 	on(name: 'uploadProgress' | 'downloadProgress', listener: (progress: Progress) => void): T;
 }
 

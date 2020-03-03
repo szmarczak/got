@@ -90,7 +90,7 @@
 		"to-readable-stream": "^2.1.0",
 		"tough-cookie": "^3.0.0",
 		"typescript": "3.7.5",
-		"xo": "^0.26.0"
+		"xo": "^0.26.1"
 	},
 	"types": "dist/source",
 	"sideEffects": false,
