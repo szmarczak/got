@@ -94,9 +94,6 @@
 	},
 	"types": "dist/source",
 	"sideEffects": false,
-	"browser": {
-		"decompress-response": false
-	},
 	"ava": {
 		"files": [
 			"test/*"
