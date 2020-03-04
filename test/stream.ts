@@ -9,7 +9,7 @@ import getStream = require('get-stream');
 import pEvent = require('p-event');
 import FormData = require('form-data');
 import is from '@sindresorhus/is';
-import got from '../source';
+import got, {RequestError} from '../source';
 import withServer from './helpers/with-server';
 
 const pStreamPipeline = promisify(stream.pipeline);
@@ -328,5 +328,13 @@ test('works with pipeline', async t => {
 			}
 		}),
 		got.stream.put('http://localhost:7777')
-	), {message: 'connect ECONNREFUSED 127.0.0.1:7777'});
+	), {
+		instanceOf: RequestError
+		// Do not check the message, because locally it throws:
+		// `connect ECONNREFUSED 127.0.0.1:7777`
+		// while Travis throws:
+		// `ENOTFOUND localhost`
+		//
+		// It's because Travis doesn't define `localhost` in /etc/hosts
+	});
 });
