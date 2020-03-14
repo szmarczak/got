@@ -46,11 +46,11 @@
 		"@sindresorhus/is": "^2.1.0",
 		"@szmarczak/http-timer": "^4.0.0",
 		"@types/cacheable-request": "^6.0.1",
-		"cacheable-lookup": "^3.2.1",
+		"cacheable-lookup": "^4.0.1",
 		"cacheable-request": "^7.0.1",
 		"decompress-response": "^5.0.0",
 		"get-stream": "^5.0.0",
-		"http2-wrapper": "^1.0.0-beta.4.2",
+		"http2-wrapper": "^1.0.0-beta.4.3",
 		"lowercase-keys": "^2.0.0",
 		"p-cancelable": "^2.0.0",
 		"responselike": "^2.0.0"
