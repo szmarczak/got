@@ -83,7 +83,12 @@ test('filters elements', withServer, async (t, server, got) => {
 
 	const result = await got.paginate.all({
 		_pagination: {
-			filter: (element: unknown) => element !== 2
+			filter: (element: unknown, allItems: unknown[], currentItems: unknown[]) => {
+				t.true(Array.isArray(allItems));
+				t.true(Array.isArray(currentItems));
+
+				return element !== 2;
+			}
 		}
 	});
 
@@ -119,7 +124,7 @@ test('custom paginate function', withServer, async (t, server, got) => {
 
 	const result = await got.paginate.all({
 		_pagination: {
-			paginate: response => {
+			paginate: (response: Response) => {
 				const url = new URL(response.url);
 
 				if (url.search === '?page=3') {
@@ -129,6 +134,42 @@ test('custom paginate function', withServer, async (t, server, got) => {
 				url.search = '?page=3';
 
 				return {url};
+			}
+		}
+	});
+
+	t.deepEqual(result, [1, 3]);
+});
+
+test('custom paginate function using allItems', withServer, async (t, server, got) => {
+	attachHandler(server, 3);
+
+	const result = await got.paginate.all({
+		_pagination: {
+			paginate: (_response: Response, allItems: unknown[]) => {
+				if (allItems.length === 2) {
+					return false;
+				}
+
+				return {path: '/?page=3'};
+			}
+		}
+	});
+
+	t.deepEqual(result, [1, 3]);
+});
+
+test('custom paginate function using currentItems', withServer, async (t, server, got) => {
+	attachHandler(server, 3);
+
+	const result = await got.paginate.all({
+		_pagination: {
+			paginate: (_response: Response, _allItems: unknown[], currentItems: unknown[]) => {
+				if (currentItems[0] === 3) {
+					return false;
+				}
+
+				return {path: '/?page=3'};
 			}
 		}
 	});
@@ -153,7 +194,12 @@ test('`shouldContinue` works', withServer, async (t, server, got) => {
 
 	const options = {
 		_pagination: {
-			shouldContinue: () => false
+			shouldContinue: (_item: unknown, allItems: unknown[], currentItems: unknown[]) => {
+				t.true(Array.isArray(allItems));
+				t.true(Array.isArray(currentItems));
+
+				return false;
+			}
 		}
 	};
 

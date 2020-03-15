@@ -329,12 +329,7 @@ test('works with pipeline', async t => {
 		}),
 		got.stream.put('http://localhost:7777')
 	), {
-		instanceOf: RequestError
-		// Do not check the message, because locally it throws:
-		// `connect ECONNREFUSED 127.0.0.1:7777`
-		// while Travis throws:
-		// `ENOTFOUND localhost`
-		//
-		// It's because Travis doesn't define `localhost` in /etc/hosts
+		instanceOf: RequestError,
+		message: 'connect ECONNREFUSED 127.0.0.1:7777'
 	});
 });

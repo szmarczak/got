@@ -71,9 +71,9 @@ export interface Hooks extends RequestHooks {
 export interface PaginationOptions<T> {
 	_pagination?: {
 		transform?: (response: Response) => Promise<T[]> | T[];
-		filter?: (item: T, allItems: T[]) => boolean;
-		paginate?: (response: Response) => Options | false;
-		shouldContinue?: (item: T, allItems: T[]) => boolean;
+		filter?: (item: T, allItems: T[], currentItems: T[]) => boolean;
+		paginate?: (response: Response, allItems: T[], currentItems: T[]) => Options | false;
+		shouldContinue?: (item: T, allItems: T[], currentItems: T[]) => boolean;
 		countLimit?: number;
 	};
 }
